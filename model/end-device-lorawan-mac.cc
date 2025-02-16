@@ -177,7 +177,29 @@ EndDeviceLorawanMac::Send(Ptr<Packet> packet)
         // Make sure we can transmit at the current power on this channel
         NS_ASSERT_MSG(m_txPower <= m_channelHelper->GetTxPowerForChannel(txChannel),
                       " The selected power is too high to be supported by this channel.");
-        DoSend(packet);
+
+        // TODO: дублирование кода
+        // Craft LoraTxParameters object
+        LoraTxParameters params;
+        params.sf = GetSfFromDataRate(m_dataRate);
+        params.headerDisabled = m_headerDisabled;
+        params.codingRate = m_codingRate;
+        params.bandwidthHz = GetBandwidthFromDataRate(m_dataRate);
+        params.nPreamble = m_nPreambleSymbols;
+        params.crcEnabled = true;
+        params.lowDataRateOptimizationEnabled = LoraPhy::GetTSym(params) > MilliSeconds(16);
+
+        // WIP проверка состояния канала.
+        NS_LOG_FUNCTION("CAD. Checking channel state");
+        if (this->m_phy->CheckChannelActivity(packet, params, txChannel->GetFrequency(), m_txPower)) {
+            NS_LOG_FUNCTION("CAD. Channel is free");
+            DoSend(packet);
+        }
+        else {
+            NS_LOG_WARN("CAD. Rescheduling");
+            // TODO;
+            postponeTransmission(netxTxDelay, packet);
+        }
     }
 }
 
@@ -213,11 +235,13 @@ EndDeviceLorawanMac::DoSend(Ptr<Packet> packet)
         NS_LOG_INFO("Added frame header of size " << frameHdr.GetSerializedSize() << " bytes.");
 
         // Check that MACPayload length is below the allowed maximum
-        if (packet->GetSize() > m_maxAppPayloadForDataRate.at(m_dataRate))
+        uint32_t pktSize = packet->GetSize();
+        if (pktSize > m_maxAppPayloadForDataRate.at(m_dataRate))
         {
-            NS_LOG_WARN("Attempting to send a packet larger than the maximum allowed"
-                        << " size at this Data Rate (DR" << unsigned(m_dataRate)
-                        << "). Transmission canceled.");
+            NS_LOG_WARN("Attempting to send a packet (size " << pktSize
+                         << " byte)larger than the maximum allowed"
+                        << " size at this Data Rate (DR " << unsigned(m_dataRate)
+                        << " kbit/s). Transmission canceled.");
             return;
         }
 

@@ -130,6 +130,18 @@ class LoraPhy : public Object
     virtual void EndReceive(Ptr<Packet> packet, Ptr<LoraInterferenceHelper::Event> event) = 0;
 
     /**
+     * Попытка добавить CAD.
+     *
+     * - Прослушивание канала: Анализировать канал на наличие активности.
+     * - Обнаружение преамбулы: Проверять, есть ли на канале сигналы, похожие на преамбулу LoRa.
+     * - Принятие решения: Возвращать результат (true, если канал свободен, и false, если занят).
+     */
+    bool CheckChannelActivity(Ptr<Packet> packet,
+                                      LoraTxParameters txParams,
+                                      double frequencyMHz,
+                                      double txPowerDbm);
+
+    /**
      * Instruct the PHY to send a packet according to some parameters.
      *
      * \param packet The packet to send.

@@ -207,5 +207,39 @@ operator<<(std::ostream& os, const LoraTxParameters& params)
 
     return os;
 }
+
+
+/**
+ * Попытка посмотреть на занятость канала.
+ * Вообще мы должны пытаться прочитать преамбулу с нужным SF.
+ *
+ * TODO. Сейчас преамбула в отдельности нигде не декодируется. Сразу читается весь пакет
+ * Сейчас проверяется а) уровень сигнала б) интерференция
+ * Это же происходит в методе StartReceive во время определения, потерян ли пакет
+ *
+ */
+bool LoraPhy::CheckChannelActivity(Ptr<Packet> packet,
+                                       LoraTxParameters txParams,
+                                       double frequencyMHz,
+                                       double txPowerDbm)
+{
+    // Compute the duration of the transmission
+    Time duration = LoraPhy::GetOnAirTime(packet, txParams);
+    NS_LOG_FUNCTION("Channel activity detection. Packet: " << packet << txPowerDbm << unsigned(txParams.sf) << frequencyMHz << duration);
+    // без push back в список event-ов
+    Ptr<LoraInterferenceHelper::Event> event =
+        Create<LoraInterferenceHelper::Event>(duration,
+                                              txPowerDbm,
+                                              txParams.sf,
+                                              packet,
+                                              frequencyMHz);
+
+    uint8_t isChannelFree = m_interference.IsDestroyedByInterference(event);
+    // наш пакет потенциально не съедается интерференцией
+    // и его мощность достаточна, IsDestroyedByInterference = 0
+    return isChannelFree == 0;
+}
+
+
 } // namespace lorawan
 } // namespace ns3
