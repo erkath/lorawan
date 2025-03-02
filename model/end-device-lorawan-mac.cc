@@ -197,12 +197,55 @@ EndDeviceLorawanMac::Send(Ptr<Packet> packet)
         }
         else {
             NS_LOG_WARN("CAD. Rescheduling");
-            // TODO;
-            postponeTransmission(netxTxDelay, packet);
+            // TODO; exponential backoff postpone
+            postponeTransmissionBecauseOfCAD(packet);
         }
     }
 }
 
+
+// TODO: возможно, сделать ChannelAccessManager по аналогии с Wi-Fi
+// и утащить все это из mac
+Time EndDeviceLorawanMac::GenerateBackoffTime()
+{
+    // взять максимум из cw и минимального cw
+    // выбираем nSlots (для backoff) из диапазона от 0 до текущего contention window
+    // увеличить cw на 1 (с проверкой на максимум)
+    // посчитать время
+
+    this->cw = std::max(cw, cwMin);
+    // выбираем nSlots (для backoff) из диапазона от 0 до текущего contention window
+    uint32_t nSlots = m_uniformRV->GetInteger(0, cw);
+    NS_LOG_FUNCTION(this << nSlots);
+    this->cw += 1;
+
+    Time backoff = Time(nSlots * m_slotTime);
+    return backoff;
+}
+
+
+void
+EndDeviceLorawanMac::postponeTransmissionBecauseOfCAD(Ptr<Packet> packet)
+{
+    NS_LOG_FUNCTION(this);
+    Time backoffTime = GenerateBackoffTime();
+
+    // Delete previously scheduled transmissions if any.
+    Simulator::Cancel(m_nextTx);
+
+    m_nextTx = Simulator::Schedule(backoffTime, &EndDeviceLorawanMac::DoSend, this, packet);
+    NS_LOG_WARN("Attempting to send failed because of CAD (channel is busy). Scheduling a tx "
+                "at a delay "
+                << backoffTime.GetSeconds() << ".");
+
+}
+
+
+/**
+ * По идее это история про duty cycle
+ * @param netxTxDelay
+ * @param packet
+ */
 void
 EndDeviceLorawanMac::postponeTransmission(Time netxTxDelay, Ptr<Packet> packet)
 {

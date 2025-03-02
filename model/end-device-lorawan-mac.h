@@ -494,6 +494,32 @@ class EndDeviceLorawanMac : public LorawanMac
      * current value of the device frame counter.
      */
     uint16_t m_currentFCnt;
+
+
+    Time m_slotTime;
+//    uint32_t backoffSlots{0};                  //!< the number of backoff slots
+    Time backoffStart{0};                      /**< the backoffStart variable is used to keep
+                                                     track of the time at which a backoff was
+                                                     started or the time at which the backoff
+                                                     counter was last updated */
+    uint32_t cw{0};                             //!< the current contention window
+    uint32_t cwMin{0};                         //!< the minimum contention window
+    uint32_t cwMax{0};                         //!< the maximum contention window
+
+    /**
+     * Number of times that the transmitter has tried to unsuccessfuly transmit the current packet.
+     */
+    uint32_t m_numBackoffRetries;
+
+    /**
+     * Генерация backoff для этого девайса
+     *
+     * \param waitingTime Currently known minimum waiting time, possibly raised by this function.
+     * \return The updated minimum waiting time in Time format.
+     */
+    Time GenerateBackoffTime();
+
+    void postponeTransmissionBecauseOfCAD(Ptr<Packet> packet);
 };
 
 } // namespace lorawan
