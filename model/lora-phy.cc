@@ -225,7 +225,13 @@ bool LoraPhy::CheckChannelActivity(Ptr<Packet> packet,
 {
     // Compute the duration of the transmission
     Time duration = LoraPhy::GetOnAirTime(packet, txParams);
-    NS_LOG_FUNCTION("Channel activity detection. Packet: " << packet << txPowerDbm << unsigned(txParams.sf) << frequencyMHz << duration);
+    NS_LOG_DEBUG("Channel activity detection. Packet: " << packet <<
+                " txPowerDbm: " << txPowerDbm <<
+                " SF: " << unsigned(txParams.sf) <<
+                " frequencyMHz: " << frequencyMHz <<
+                " duration: " << duration);
+//    std::cerr << "Channel activity detection. Packet: " << packet << txPowerDbm << unsigned(txParams.sf) << frequencyMHz << duration;
+//    std::cerr << "Enabled? " << g_log.IsEnabled(ns3::LOG_ERROR) << std::endl;
     // без push back в список event-ов
     Ptr<LoraInterferenceHelper::Event> event =
         Create<LoraInterferenceHelper::Event>(duration,
