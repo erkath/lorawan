@@ -214,8 +214,7 @@ EndDeviceLorawanMac::Send(Ptr<Packet> packet)
         bool check = CheckActivityDetection(packet, params, txChannel);
         // TODO
         NS_LOG_FUNCTION("check is" << check);
-//        if (check) {
-        if (false) {
+        if (check) {
             NS_LOG_FUNCTION("CAD. Channel is free");
             m_numBackoffRetries = 0;
             DoSend(packet);
