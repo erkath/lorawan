@@ -141,6 +141,23 @@ EndDeviceLorawanMac::~EndDeviceLorawanMac()
 //  Sending methods   //
 ////////////////////////
 
+bool
+EndDeviceLorawanMac::CheckActivityDetection(Ptr<Packet> packet,
+                                            LoraTxParameters params,
+                                            Ptr<LogicalLoraChannel> txChannel)
+{
+    double frequencyMHz = txChannel->GetFrequency();
+    bool check = this->m_phy->CheckChannelActivity(packet,
+                                                   params,
+                                                   frequencyMHz,
+                                                   m_txPower);
+
+    // TODO: уровень сигнала
+//    NS_ASSERT_MSG(m_txPower < m_phy->GetRxSensitivity(),
+//                  " Transmitted signal will be to weak to process");
+    return check;
+}
+
 void
 EndDeviceLorawanMac::Send(Ptr<Packet> packet)
 {
@@ -157,6 +174,9 @@ EndDeviceLorawanMac::Send(Ptr<Packet> packet)
     }
 
     // Pick a channel on which to transmit the packet
+    // TODO: LogicalLoraChannel это как раз один из 4 возможных каналов в разрешенном диапазоне (?)
+    //  и тут вернется nullptr, если подходящего канала не будет
+    // duty cycle видимо
     Ptr<LogicalLoraChannel> txChannel = GetChannelForTx();
 
     if (!(txChannel && m_retxParams.retxLeft > 0))
@@ -191,8 +211,13 @@ EndDeviceLorawanMac::Send(Ptr<Packet> packet)
 
         // WIP проверка состояния канала.
         NS_LOG_FUNCTION("CAD. Checking channel state");
-        if (this->m_phy->CheckChannelActivity(packet, params, txChannel->GetFrequency(), m_txPower)) {
+        bool check = CheckActivityDetection(packet, params, txChannel);
+        // TODO
+        NS_LOG_FUNCTION("check is" << check);
+//        if (check) {
+        if (false) {
             NS_LOG_FUNCTION("CAD. Channel is free");
+            m_numBackoffRetries = 0;
             DoSend(packet);
         }
         else {
@@ -205,21 +230,21 @@ EndDeviceLorawanMac::Send(Ptr<Packet> packet)
 
 
 // TODO: возможно, сделать ChannelAccessManager по аналогии с Wi-Fi
-// и утащить все это из mac
 Time EndDeviceLorawanMac::GenerateBackoffTime()
 {
-    // взять максимум из cw и минимального cw
-    // выбираем nSlots (для backoff) из диапазона от 0 до текущего contention window
-    // увеличить cw на 1 (с проверкой на максимум)
-    // посчитать время
+    m_numBackoffRetries += 1;
+    NS_LOG_FUNCTION("Old CW: " << this->cw << "\nnumBackoffRetries: " << m_numBackoffRetries);
 
-    this->cw = std::max(cw, cwMin);
-    // выбираем nSlots (для backoff) из диапазона от 0 до текущего contention window
-    uint32_t nSlots = m_uniformRV->GetInteger(0, cw);
+    cw = (uint32_t)pow(2, m_numBackoffRetries) - 1;
+    uint32_t nSlots = m_uniformRV->GetInteger(cwMin, cw);
     NS_LOG_FUNCTION(this << nSlots);
-    this->cw += 1;
+
+    if (cw < cwMax) {
+        cw += 1;
+    }
 
     Time backoff = Time(nSlots * m_slotTime);
+    NS_LOG_FUNCTION("CW: " << this->cw << "\nbackoff: " << backoff);
     return backoff;
 }
 
@@ -234,8 +259,7 @@ EndDeviceLorawanMac::postponeTransmissionBecauseOfCAD(Ptr<Packet> packet)
     Simulator::Cancel(m_nextTx);
 
     m_nextTx = Simulator::Schedule(backoffTime, &EndDeviceLorawanMac::DoSend, this, packet);
-    NS_LOG_WARN("Attempting to send failed because of CAD (channel is busy). Scheduling a tx "
-                "at a delay "
+    NS_LOG_WARN("CAD: channel busy, backing off for "
                 << backoffTime.GetSeconds() << ".");
 
 }
