@@ -340,6 +340,13 @@ class LoraPhy : public Object
      * The callback to perform upon the end of a transmission.
      */
     TxFinishedCallback m_txFinishedCallback;
+
+    /**
+     * Receive sensitivity threshold
+     */
+    double m_rxSensitivity;
+
+    Time GetCADTime(LoraTxParameters txParams);
 };
 
 } // namespace lorawan

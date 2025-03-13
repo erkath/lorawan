@@ -11,6 +11,8 @@
 #include "ns3/log.h"
 #include "ns3/simulator.h"
 
+#include "ns3/double.h"
+
 #include <algorithm>
 
 namespace ns3
@@ -152,6 +154,30 @@ LoraPhy::GetTSym(LoraTxParameters txParams)
     return Seconds(pow(2, int(txParams.sf)) / (txParams.bandwidthHz));
 }
 
+/**
+ * Introduction to Channel Activity Detection, p. 4
+ * Version 2.0
+ * AN1200.85 April 2024, Semtech Corporation
+ *
+ *
+ * @param packet
+ * @param txParams
+ * @return
+ */
+Time
+LoraPhy::GetCADTime(LoraTxParameters txParams)
+{
+    //  [Tsymbol + (32/BW)] milliseconds, Tsymbol -- это один чирп
+    // Tsymbol is the duration that is the airtime of a single LoRa chirp, depending on the SF value.
+
+    // Compute the symbol duration
+    // Bandwidth is in Hz
+    double tSym = GetTSym(txParams).GetSeconds();
+
+    // bandwidthHz в герцах
+    return Seconds(tSym + 32 / txParams.bandwidthHz);
+}
+
 Time
 LoraPhy::GetOnAirTime(Ptr<Packet> packet, LoraTxParameters txParams)
 {
@@ -224,7 +250,7 @@ bool LoraPhy::CheckChannelActivity(Ptr<Packet> packet,
                                        double txPowerDbm)
 {
     // Compute the duration of the transmission
-    Time duration = LoraPhy::GetOnAirTime(packet, txParams);
+    Time duration = LoraPhy::GetCADTime(txParams);
     NS_LOG_DEBUG("Channel activity detection. Packet: " << packet <<
                 " txPowerDbm: " << txPowerDbm <<
                 " SF: " << unsigned(txParams.sf) <<
