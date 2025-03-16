@@ -93,6 +93,11 @@ EndDeviceLorawanMac::GetTypeId()
                                           "Unconfirmed",
                                           LorawanMacHeader::CONFIRMED_DATA_UP,
                                           "Confirmed"))
+            .AddAttribute("CsmaEnabled",
+                          "Channel Activity Detection: CSMA method enabled",
+                          BooleanValue(true),
+                          MakeBooleanAccessor(&EndDeviceLorawanMac::m_CsmaEnabled),
+                          MakeBooleanChecker())
             .AddConstructor<EndDeviceLorawanMac>();
     return tid;
 }
@@ -158,6 +163,22 @@ EndDeviceLorawanMac::CheckActivityDetection(Ptr<Packet> packet,
     return check;
 }
 
+void EndDeviceLorawanMac::CheckChannelActivityAndDoSend(Ptr<Packet> packet,
+                                                       LoraTxParameters params,
+                                                       Ptr<LogicalLoraChannel> txChannel) {
+    NS_LOG_FUNCTION("CAD. Checking channel state");
+    bool check = CheckActivityDetection(packet, params, txChannel);
+    if (check) {
+        NS_LOG_FUNCTION("CAD. Channel is free");
+        m_numBackoffRetries = 0;
+        DoSend(packet);
+    }
+    else {
+        NS_LOG_FUNCTION("CAD. Rescheduling");
+        postponeTransmissionBecauseOfCAD(packet, params, txChannel);
+    }
+}
+
 void
 EndDeviceLorawanMac::Send(Ptr<Packet> packet)
 {
@@ -209,26 +230,17 @@ EndDeviceLorawanMac::Send(Ptr<Packet> packet)
         params.crcEnabled = true;
         params.lowDataRateOptimizationEnabled = LoraPhy::GetTSym(params) > MilliSeconds(16);
 
-        // WIP проверка состояния канала.
-        NS_LOG_FUNCTION("CAD. Checking channel state");
-        bool check = CheckActivityDetection(packet, params, txChannel);
-        // TODO
-        NS_LOG_FUNCTION("check is" << check);
-        if (check) {
-            NS_LOG_FUNCTION("CAD. Channel is free");
-            m_numBackoffRetries = 0;
+
+        if (!m_CsmaEnabled) {
             DoSend(packet);
-        }
-        else {
-            NS_LOG_WARN("CAD. Rescheduling");
-            // TODO; exponential backoff postpone
-            postponeTransmissionBecauseOfCAD(packet);
+        } else {
+            // WIP проверка состояния канала.
+            CheckChannelActivityAndDoSend(packet, params, txChannel);
         }
     }
 }
 
 
-// TODO: возможно, сделать ChannelAccessManager по аналогии с Wi-Fi
 Time EndDeviceLorawanMac::GenerateBackoffTime()
 {
     m_numBackoffRetries += 1;
@@ -249,7 +261,9 @@ Time EndDeviceLorawanMac::GenerateBackoffTime()
 
 
 void
-EndDeviceLorawanMac::postponeTransmissionBecauseOfCAD(Ptr<Packet> packet)
+EndDeviceLorawanMac::postponeTransmissionBecauseOfCAD(Ptr<Packet> packet,
+                                                      LoraTxParameters params,
+                                                      Ptr<LogicalLoraChannel> txChannel)
 {
     NS_LOG_FUNCTION(this);
     Time backoffTime = GenerateBackoffTime();
@@ -257,7 +271,8 @@ EndDeviceLorawanMac::postponeTransmissionBecauseOfCAD(Ptr<Packet> packet)
     // Delete previously scheduled transmissions if any.
     Simulator::Cancel(m_nextTx);
 
-    m_nextTx = Simulator::Schedule(backoffTime, &EndDeviceLorawanMac::DoSend, this, packet);
+//    m_nextTx = Simulator::Schedule(backoffTime, &EndDeviceLorawanMac::DoSend, this, packet);
+    m_nextTx = Simulator::Schedule(backoffTime, &EndDeviceLorawanMac::CheckChannelActivityAndDoSend, this, packet, params, txChannel);
     NS_LOG_WARN("CAD: channel busy, backing off for "
                 << backoffTime.GetSeconds() << ".");
 

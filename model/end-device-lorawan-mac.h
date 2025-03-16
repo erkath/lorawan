@@ -359,6 +359,7 @@ class EndDeviceLorawanMac : public LorawanMac
 
     bool
         m_enableDRAdapt; //!< Enable data rate adaptation (ADR) during the retransmission procedure.
+    bool m_CsmaEnabled = true;
     uint8_t
         m_maxNumbTx; //!< Default number of unacknowledged redundant transmissions of each packet.
     TracedValue<uint8_t> m_dataRate; //!< The data rate this device is using to transmit.
@@ -510,9 +511,14 @@ class EndDeviceLorawanMac : public LorawanMac
      */
     Time GenerateBackoffTime();
 
-    void postponeTransmissionBecauseOfCAD(Ptr<Packet> packet);
+    void postponeTransmissionBecauseOfCAD(Ptr<Packet> packet,
+                                          LoraTxParameters params,
+                                          Ptr<LogicalLoraChannel> txChannel);
 
     bool CheckActivityDetection(Ptr<Packet> packet, LoraTxParameters params, Ptr<LogicalLoraChannel> txChannel);
+    void CheckChannelActivityAndDoSend(Ptr<Packet> packet,
+                                           LoraTxParameters params,
+                                           Ptr<LogicalLoraChannel> txChannel);
 };
 
 } // namespace lorawan
