@@ -44,9 +44,9 @@ using namespace lorawan;
 NS_LOG_COMPONENT_DEFINE("AlohaThroughput");
 
 // Network settings
-int nDevices = 200;                 //!< Number of end device nodes to create
+int nDevices = 300;                 //!< Number of end device nodes to create
 int nGateways = 1;                  //!< Number of gateway nodes to create
-double radiusMeters = 1000;         //!< Radius (m) of the deployment
+double radiusMeters = 0.2;          //!< Radius (m) of the deployment
 double simulationTimeSeconds = 100; //!< Scenario duration (s) in simulated time
 
 // Channel model
@@ -105,17 +105,19 @@ main(int argc, char* argv[])
     cmd.AddValue("CsmaEnabled", "ns3::EndDeviceLorawanMac::CsmaEnabled");
     cmd.Parse(argc, argv);
 
-    int appPeriodSeconds = simulationTimeSeconds;
+    int appPeriodSeconds = 35;
 
     // Set up logging
     LogComponentEnable("AlohaThroughput", LOG_LEVEL_ALL);
-    LogComponentEnable("LoraPhy", LOG_LEVEL_ALL);
-    LogComponentEnable("LoraChannel", LOG_LEVEL_ALL);
-    LogComponentEnable("EndDeviceLoraPhy", LOG_LEVEL_ALL);
-    //     LogComponentEnable("LogicalLoraChannelHelper", LOG_LEVEL_ALL);
-    LogComponentEnable("EndDeviceLorawanMac", LOG_LEVEL_ALL);
-    LogComponentEnable("ClassAEndDeviceLorawanMac", LOG_LEVEL_ALL);
-    LogComponentEnable("LoraInterferenceHelper", LOG_LEVEL_ALL);
+    //
+    //    LogComponentEnable("LoraPhy", LOG_LEVEL_ALL);
+    //    LogComponentEnable("LoraChannel", LOG_LEVEL_ALL);
+    //    LogComponentEnable("EndDeviceLoraPhy", LOG_LEVEL_ALL);
+    //    //     LogComponentEnable("LogicalLoraChannelHelper", LOG_LEVEL_ALL);
+    //    LogComponentEnable("EndDeviceLorawanMac", LOG_LEVEL_ALL);
+    ////    LogComponentEnable("ClassAEndDeviceLorawanMac", LOG_LEVEL_ALL);
+    //    LogComponentEnable("LoraInterferenceHelper", LOG_LEVEL_ALL);
+    //    LogComponentEnable("LorawanMacHelper", LOG_LEVEL_ALL);
 
     // Make all devices use SF7 (i.e., DR5)
     // Config::SetDefault ("ns3::EndDeviceLorawanMac::DataRate", UintegerValue (5));
@@ -263,10 +265,17 @@ main(int argc, char* argv[])
 
     Time appStopTime = Seconds(simulationTimeSeconds);
     int packetSize = 50;
+
     PeriodicSenderHelper appHelper = PeriodicSenderHelper();
-    appHelper.SetPeriod(Seconds(appPeriodSeconds));
     appHelper.SetPacketSize(packetSize);
-    ApplicationContainer appContainer = appHelper.Install(endDevices);
+
+    ApplicationContainer appContainer{};
+    for (int i = 0; i < nDevices; ++i)
+    {
+        appHelper.SetPeriod(Seconds((double)appPeriodSeconds / 2 +
+                                    (double)appPeriodSeconds / 2 * (double)i / (double)nDevices));
+        appContainer.Add(appHelper.Install(endDevices));
+    }
 
     appContainer.Start(Seconds(0));
     appContainer.Stop(appStopTime);
@@ -368,8 +377,9 @@ main(int argc, char* argv[])
 
     for (int i = 0; i < 6; i++)
     {
-        std::cout << "Packet sent at SF=" << i + 7 << ": " << packetsSent.at(i) << " ;"
-                  << "Packet received at SF=" << i + 7 << ": " << packetsReceived.at(i) << std::endl;
+        std::cout << "Packet sent at SF=" << i + 7 << ": " << packetsSent.at(i) << "; "
+                  << "Packet received at SF=" << i + 7 << ": " << packetsReceived.at(i)
+                  << std::endl;
     }
 
     return 0;
