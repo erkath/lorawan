@@ -230,6 +230,9 @@ LoraRadioEnergyModel::ChangeState(int newState)
     case EndDeviceLoraPhy::SLEEP:
         energyToDecrease = duration.GetSeconds() * m_sleepCurrentA * supplyVoltage;
         break;
+    case EndDeviceLoraPhy::CCA:
+        energyToDecrease = duration.GetSeconds() * m_rxCurrentA * supplyVoltage;
+        break;
     default:
         NS_FATAL_ERROR("LoraRadioEnergyModel:Undefined radio state: " << m_currentState);
     }
@@ -356,6 +359,9 @@ LoraRadioEnergyModel::SetLoraRadioState(const EndDeviceLoraPhy::State state)
     case EndDeviceLoraPhy::SLEEP:
         stateName = "SLEEP";
         break;
+    case EndDeviceLoraPhy::CCA:
+        stateName = "CCA";
+        break;
     }
     NS_LOG_DEBUG("LoraRadioEnergyModel:Switching to state: "
                  << stateName << " at time = " << Simulator::Now().GetSeconds() << " s");
@@ -432,6 +438,17 @@ LoraRadioEnergyModelPhyListener::NotifySleep()
 
 void
 LoraRadioEnergyModelPhyListener::NotifyStandby()
+{
+    NS_LOG_FUNCTION(this);
+    if (m_changeStateCallback.IsNull())
+    {
+        NS_FATAL_ERROR("LoraRadioEnergyModelPhyListener:Change state callback not set!");
+    }
+    m_changeStateCallback(EndDeviceLoraPhy::STANDBY);
+}
+
+void
+LoraRadioEnergyModelPhyListener::NotifyCcaBusy()
 {
     NS_LOG_FUNCTION(this);
     if (m_changeStateCallback.IsNull())

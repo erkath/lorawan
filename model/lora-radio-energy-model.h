@@ -80,6 +80,11 @@ class LoraRadioEnergyModelPhyListener : public EndDeviceLoraPhyListener
      */
     void NotifyStandby() override;
 
+    /**
+     * Попытка
+     */
+    void NotifyCcaBusy() override;
+
   private:
     /**
      * A helper function that makes scheduling m_changeStateCallback possible.

@@ -331,6 +331,9 @@ ClassAEndDeviceLorawanMac::CloseFirstReceiveWindow()
         // Turn PHY layer to SLEEP
         phy->SwitchToSleep();
         break;
+    case EndDeviceLoraPhy::CCA:
+        // TODO
+        break;
     }
 }
 
@@ -396,6 +399,8 @@ ClassAEndDeviceLorawanMac::CloseSecondReceiveWindow()
     case EndDeviceLoraPhy::STANDBY:
         // Turn PHY layer to sleep
         phy->SwitchToSleep();
+        break;
+    case EndDeviceLoraPhy::CCA:
         break;
     }
 

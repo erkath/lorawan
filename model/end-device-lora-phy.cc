@@ -135,11 +135,26 @@ EndDeviceLoraPhy::SwitchToStandby()
 }
 
 void
+EndDeviceLoraPhy::SwitchToCca()
+{
+    NS_LOG_FUNCTION_NOARGS();
+
+    m_state = CCA;
+
+    // Notify listeners of the state change
+    for (auto i = m_listeners.begin(); i != m_listeners.end(); i++)
+    {
+        // a.
+        (*i)->NotifyCcaBusy();
+    }
+}
+
+void
 EndDeviceLoraPhy::SwitchToRx()
 {
     NS_LOG_FUNCTION_NOARGS();
 
-    NS_ASSERT(m_state == STANDBY);
+    NS_ASSERT(m_state == STANDBY || m_state == CCA);
 
     m_state = RX;
 

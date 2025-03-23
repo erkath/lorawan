@@ -167,14 +167,17 @@ void EndDeviceLorawanMac::CheckChannelActivityAndDoSend(Ptr<Packet> packet,
                                                        LoraTxParameters params,
                                                        Ptr<LogicalLoraChannel> txChannel) {
     NS_LOG_FUNCTION("CAD. Checking channel state");
-    bool check = CheckActivityDetection(packet, params, txChannel);
-    if (check) {
+    DynamicCast<EndDeviceLoraPhy>(m_phy)->SwitchToCca();
+    if (CheckActivityDetection(packet, params, txChannel)) {
+        // TODO: ?? в
+//        DynamicCast<EndDeviceLoraPhy>(m_phy)->SwitchToStandby();
         NS_LOG_FUNCTION("CAD. Channel is free");
         m_numBackoffRetries = 0;
         DoSend(packet);
     }
     else {
         NS_LOG_FUNCTION("CAD. Rescheduling");
+        DynamicCast<EndDeviceLoraPhy>(m_phy)->SwitchToStandby();
         postponeTransmissionBecauseOfCAD(packet, params, txChannel);
     }
 }

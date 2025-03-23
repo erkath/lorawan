@@ -69,6 +69,12 @@ class EndDeviceLoraPhyListener
      * Notify listeners that we woke up.
      */
     virtual void NotifyStandby() = 0;
+
+    /**
+     * Notify listeners that someone captured the channel.
+     * Вопрос только, не должно ли это быть свойство канала в таком случае.
+     */
+    virtual void NotifyCcaBusy() = 0;
 };
 
 /**
@@ -129,7 +135,11 @@ class EndDeviceLoraPhy : public LoraPhy
          * While the device is locked on an incoming packet, transmission is
          * not possible.
          */
-        RX
+        RX,
+        /**
+         * Checking the channel state (Channel Activity Detection mechanism)
+         */
+        CCA
     };
 
     /**
@@ -201,6 +211,11 @@ class EndDeviceLoraPhy : public LoraPhy
      * Switch to the STANDBY state.
      */
     void SwitchToStandby();
+
+    /**
+     * Switch to the CCA state.
+     */
+    void SwitchToCca();
 
     /**
      * Switch to the SLEEP state.
