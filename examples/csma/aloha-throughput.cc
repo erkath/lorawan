@@ -6,6 +6,7 @@
  * Author: Davide Magrin <magrinda@dei.unipd.it>
  */
 
+#include "ns3/basic-energy-source-helper.h"
 #include "ns3/building-allocator.h"
 #include "ns3/building-penetration-loss.h"
 #include "ns3/buildings-helper.h"
@@ -16,6 +17,7 @@
 #include "ns3/double.h"
 #include "ns3/end-device-lora-phy.h"
 #include "ns3/end-device-lorawan-mac.h"
+#include "ns3/file-helper.h"
 #include "ns3/forwarder-helper.h"
 #include "ns3/gateway-lora-phy.h"
 #include "ns3/gateway-lorawan-mac.h"
@@ -25,6 +27,7 @@
 #include "ns3/lora-helper.h"
 #include "ns3/lora-net-device.h"
 #include "ns3/lora-phy.h"
+#include "ns3/lora-radio-energy-model-helper.h"
 #include "ns3/lorawan-mac-header.h"
 #include "ns3/mobility-helper.h"
 #include "ns3/network-server-helper.h"
@@ -44,10 +47,12 @@ using namespace lorawan;
 NS_LOG_COMPONENT_DEFINE("AlohaThroughput");
 
 // Network settings
-int nDevices = 300;                 //!< Number of end device nodes to create
+int nDevices = 200;                 //!< Number of end device nodes to create
 int nGateways = 1;                  //!< Number of gateway nodes to create
-double radiusMeters = 0.2;          //!< Radius (m) of the deployment
+double radiusMeters = 1000;         //!< Radius (m) of the deployment
 double simulationTimeSeconds = 100; //!< Scenario duration (s) in simulated time
+
+// double simulationTimeSeconds = 500; //!< Scenario duration (s) in simulated time
 
 // Channel model
 bool realisticChannelModel = false; //!< Whether to use a more realistic channel model with
@@ -105,10 +110,10 @@ main(int argc, char* argv[])
     cmd.AddValue("CsmaEnabled", "ns3::EndDeviceLorawanMac::CsmaEnabled");
     cmd.Parse(argc, argv);
 
-    int appPeriodSeconds = 35;
+    int appPeriodSeconds = 180;
 
     // Set up logging
-    LogComponentEnable("AlohaThroughput", LOG_LEVEL_ALL);
+    //    LogComponentEnable("AlohaThroughput", LOG_LEVEL_ALL);
     //
     //    LogComponentEnable("LoraPhy", LOG_LEVEL_ALL);
     //    LogComponentEnable("LoraChannel", LOG_LEVEL_ALL);
@@ -120,7 +125,7 @@ main(int argc, char* argv[])
     //    LogComponentEnable("LorawanMacHelper", LOG_LEVEL_ALL);
 
     // Make all devices use SF7 (i.e., DR5)
-    // Config::SetDefault ("ns3::EndDeviceLorawanMac::DataRate", UintegerValue (5));
+    //     Config::SetDefault ("ns3::EndDeviceLorawanMac::DataRate", UintegerValue (5));
 
     if (interferenceMatrix == "aloha")
     {
@@ -226,7 +231,7 @@ main(int argc, char* argv[])
     macHelper.SetAddressGenerator(addrGen);
     phyHelper.SetDeviceType(LoraPhyHelper::ED);
     macHelper.SetDeviceType(LorawanMacHelper::ED_A);
-    helper.Install(phyHelper, macHelper, endDevices);
+    NetDeviceContainer endDevicesNetDevices = helper.Install(phyHelper, macHelper, endDevices);
 
     // Now end devices are connected to the channel
 
@@ -270,6 +275,7 @@ main(int argc, char* argv[])
     appHelper.SetPacketSize(packetSize);
 
     ApplicationContainer appContainer{};
+    // Разброс периодов
     for (int i = 0; i < nDevices; ++i)
     {
         appHelper.SetPeriod(Seconds((double)appPeriodSeconds / 2 +
@@ -359,6 +365,64 @@ main(int argc, char* argv[])
 
     LorawanMacHelper::SetSpreadingFactorsUp(endDevices, gateways, channel);
 
+    /************************
+     * Install Energy Model *
+     ************************/
+
+    BasicEnergySourceHelper basicSourceHelper;
+    LoraRadioEnergyModelHelper radioEnergyHelper;
+
+    // configure energy source
+    basicSourceHelper.Set("BasicEnergySourceInitialEnergyJ", DoubleValue(10000)); // Energy in J
+    basicSourceHelper.Set("BasicEnergySupplyVoltageV", DoubleValue(3.3));
+
+    radioEnergyHelper.Set("StandbyCurrentA", DoubleValue(0.0014));
+    radioEnergyHelper.Set("TxCurrentA", DoubleValue(0.028));
+    radioEnergyHelper.Set("SleepCurrentA", DoubleValue(0.0000015));
+    radioEnergyHelper.Set("RxCurrentA", DoubleValue(0.0112));
+
+    radioEnergyHelper.SetTxCurrentModel("ns3::ConstantLoraTxCurrentModel",
+                                        "TxCurrent",
+                                        DoubleValue(0.028));
+
+    // install source on end devices' nodes
+    EnergySourceContainer sources = basicSourceHelper.Install(endDevices);
+
+    uint32_t step = sources.GetN() / 5;
+
+    for (uint32_t i = 0; i < sources.GetN(); i += step)
+    {
+        Names::Add("/Names/EnergySource" + std::to_string(i), sources.Get(i));
+    }
+
+    std::cout << "Size: " << sources.GetN() << std::endl;
+
+    // install device model
+    DeviceEnergyModelContainer deviceModels =
+        radioEnergyHelper.Install(endDevicesNetDevices, sources);
+
+    /**************
+     * Get output *
+     **************/
+
+    std::vector<std::string> energySourceNames;
+    for (uint32_t i = 0; i < sources.GetN(); i += step)
+    {
+        energySourceNames.push_back("/Names/EnergySource" + std::to_string(i) + "/RemainingEnergy");
+    }
+
+    std::string cadFlag = csmaEnabled ? "true" : "false";
+
+    FileHelper fileHelper;
+    //    fileHelper.ConfigureFile("battery-level-without-cad-" + std::to_string(nDevices),
+    //    FileAggregator::SPACE_SEPARATED);
+    fileHelper.ConfigureFile("battery-level-cad=" + cadFlag + "-" + std::to_string(nDevices),
+                             FileAggregator::SPACE_SEPARATED);
+    //    fileHelper.Set2dFormat("Time (Seconds) = %.3e\tEnergy Level = %.0f");
+    fileHelper.WriteProbeArray("ns3::DoubleProbe", energySourceNames, "Output");
+    //    fileHelper.WriteProbe("ns3::DoubleProbe", "/Names/EnergySource1/RemainingEnergy",
+    //    "Output");
+
     ////////////////
     // Simulation //
     ////////////////
@@ -377,7 +441,7 @@ main(int argc, char* argv[])
 
     for (int i = 0; i < 6; i++)
     {
-        std::cout << "Packet sent at SF=" << i + 7 << ": " << packetsSent.at(i) << "; "
+        std::cout << "Packet sent at SF=" << i + 7 << ": " << packetsSent.at(i) << " ;"
                   << "Packet received at SF=" << i + 7 << ": " << packetsReceived.at(i)
                   << std::endl;
     }
