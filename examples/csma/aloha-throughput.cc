@@ -411,12 +411,12 @@ main(int argc, char* argv[])
         energySourceNames.push_back("/Names/EnergySource" + std::to_string(i) + "/RemainingEnergy");
     }
 
-    std::string cadFlag = csmaEnabled ? "true" : "false";
+    std::string cadFlag = csmaEnabled ? "cad" : "without_cad";
 
-    FileHelper fileHelper;
-    //    fileHelper.ConfigureFile("battery-level-without-cad-" + std::to_string(nDevices),
+    FileHelper fileHelper; //    fileHelper.ConfigureFile("battery-level-without-cad-" +
+                           //    std::to_string(nDevices),
     //    FileAggregator::SPACE_SEPARATED);
-    fileHelper.ConfigureFile("battery-level-cad=" + cadFlag + "-" + std::to_string(nDevices),
+    fileHelper.ConfigureFile("battery-level-" + cadFlag + "-" + std::to_string(nDevices),
                              FileAggregator::SPACE_SEPARATED);
     //    fileHelper.Set2dFormat("Time (Seconds) = %.3e\tEnergy Level = %.0f");
     fileHelper.WriteProbeArray("ns3::DoubleProbe", energySourceNames, "Output");
