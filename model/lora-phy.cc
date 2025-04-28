@@ -63,7 +63,12 @@ LoraPhy::GetTypeId()
                             "could not be correctly received because"
                             "its received power is below the sensitivity of the receiver",
                             MakeTraceSourceAccessor(&LoraPhy::m_underSensitivity),
-                            "ns3::Packet::TracedCallback");
+                            "ns3::Packet::TracedCallback")
+            .AddAttribute("RxSensitivity",
+                          "The sensitivity of the receiver in dBm.",
+                          DoubleValue(-120.0), // Значение по умолчанию
+                          MakeDoubleAccessor(&LoraPhy::m_rxSensitivity),
+                          MakeDoubleChecker<double>());
     return tid;
 }
 
@@ -160,6 +165,12 @@ LoraPhy::GetTSym(LoraTxParameters txParams)
  * AN1200.85 April 2024, Semtech Corporation
  *
  *
+ * The radio then switches to the CAD mode and performs a CAD operation,
+ * which lasts [Tsymbol + (32/BW)] milliseconds, during which
+ * the radio performs a receive operation correlation on the received samples.
+ *
+ * Tsymbol is the duration that is the airtime of a single LoRa chirp, depending on the SF value.
+ *
  * @param packet
  * @param txParams
  * @return
@@ -167,11 +178,8 @@ LoraPhy::GetTSym(LoraTxParameters txParams)
 Time
 LoraPhy::GetCADTime(LoraTxParameters txParams)
 {
-    //  [Tsymbol + (32/BW)] milliseconds, Tsymbol -- это один чирп
-    // Tsymbol is the duration that is the airtime of a single LoRa chirp, depending on the SF value.
-
     // Compute the symbol duration
-    // Bandwidth is in Hz
+    // Bandwidth in Hz
     double tSym = GetTSym(txParams).GetSeconds();
 
     // bandwidthHz в герцах
@@ -249,28 +257,31 @@ bool LoraPhy::CheckChannelActivity(Ptr<Packet> packet,
                                        double frequencyMHz,
                                        double txPowerDbm)
 {
-    // Compute the duration of the transmission
-    Time duration = LoraPhy::GetCADTime(txParams);
+    // Compute the CAD duration
+    Time cadDuration = LoraPhy::GetCADTime(txParams);
     NS_LOG_DEBUG("Channel activity detection. Packet: " << packet <<
                 " txPowerDbm: " << txPowerDbm <<
                 " SF: " << unsigned(txParams.sf) <<
                 " frequencyMHz: " << frequencyMHz <<
-                " duration: " << duration);
+                " CAD duration: " << cadDuration);
 //    std::cerr << "Channel activity detection. Packet: " << packet << txPowerDbm << unsigned(txParams.sf) << frequencyMHz << duration;
 //    std::cerr << "Enabled? " << g_log.IsEnabled(ns3::LOG_ERROR) << std::endl;
-    // без push back в список event-ов
-    Ptr<LoraInterferenceHelper::Event> event =
-        Create<LoraInterferenceHelper::Event>(duration,
-                                              txPowerDbm,
-                                              txParams.sf,
-                                              packet,
-                                              frequencyMHz);
 
-    uint8_t isChannelFree = m_interference.IsDestroyedByInterference(event);
-    // наш пакет потенциально не съедается интерференцией
-    // и его мощность достаточна, IsDestroyedByInterference = 0
+    uint8_t isChannelFree = m_interference.PotentiallyDestroyedByInterference(cadDuration,
+                                                                              txPowerDbm,
+                                                                              txParams.sf,
+                                                                              frequencyMHz);
+    // наш пакет потенциально не съедается интерференцией и его мощность достаточна, IsDestroyedByInterference = 0
     return isChannelFree == 0;
+    // TODO: уровень сигнала?
 }
+
+double
+LoraPhy::GetRxSensitivity() const
+{
+    return m_rxSensitivity;
+}
+
 
 
 } // namespace lorawan

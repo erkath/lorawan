@@ -158,6 +158,7 @@ EndDeviceLorawanMac::CheckActivityDetection(Ptr<Packet> packet,
                                                    m_txPower);
 
     // TODO: уровень сигнала
+    NS_LOG_INFO("CAD. Check is: " << check);
 //    NS_ASSERT_MSG(m_txPower < m_phy->GetRxSensitivity(),
 //                  " Transmitted signal will be to weak to process");
     return check;
@@ -166,17 +167,19 @@ EndDeviceLorawanMac::CheckActivityDetection(Ptr<Packet> packet,
 void EndDeviceLorawanMac::CheckChannelActivityAndDoSend(Ptr<Packet> packet,
                                                        LoraTxParameters params,
                                                        Ptr<LogicalLoraChannel> txChannel) {
-    NS_LOG_FUNCTION("CAD. Checking channel state");
+    NS_LOG_INFO("CAD. Checking channel state");
     DynamicCast<EndDeviceLoraPhy>(m_phy)->SwitchToCca();
     if (CheckActivityDetection(packet, params, txChannel)) {
-        // TODO: ?? в
+
+
 //        DynamicCast<EndDeviceLoraPhy>(m_phy)->SwitchToStandby();
-        NS_LOG_FUNCTION("CAD. Channel is free");
+        NS_LOG_INFO("CAD. Channel is free");
         m_numBackoffRetries = 0;
+        // in TX in SimpleEndDeviceLoraPhy::Send
         DoSend(packet);
     }
     else {
-        NS_LOG_FUNCTION("CAD. Rescheduling");
+        NS_LOG_INFO("CAD. Rescheduling");
         DynamicCast<EndDeviceLoraPhy>(m_phy)->SwitchToStandby();
         postponeTransmissionBecauseOfCAD(packet, params, txChannel);
     }
@@ -187,6 +190,7 @@ EndDeviceLorawanMac::Send(Ptr<Packet> packet)
 {
     NS_LOG_FUNCTION(this << packet);
 
+//    std::cout << "AA" << m_CsmaEnabled;
     // If it is not possible to transmit now because of the duty cycle,
     // or because we are receiving, schedule a tx/retx later
 
@@ -276,7 +280,7 @@ EndDeviceLorawanMac::postponeTransmissionBecauseOfCAD(Ptr<Packet> packet,
 
 //    m_nextTx = Simulator::Schedule(backoffTime, &EndDeviceLorawanMac::DoSend, this, packet);
     m_nextTx = Simulator::Schedule(backoffTime, &EndDeviceLorawanMac::CheckChannelActivityAndDoSend, this, packet, params, txChannel);
-    NS_LOG_WARN("CAD: channel busy, backing off for "
+    NS_LOG_INFO("CAD: channel busy, backing off for "
                 << backoffTime.GetSeconds() << ".");
 
 }
@@ -316,7 +320,7 @@ EndDeviceLorawanMac::DoSend(Ptr<Packet> packet)
         ApplyNecessaryOptions(frameHdr);
         packet->AddHeader(frameHdr);
 
-        NS_LOG_INFO("Added frame header of size " << frameHdr.GetSerializedSize() << " bytes.");
+        NS_LOG_DEBUG("Added frame header of size " << frameHdr.GetSerializedSize() << " bytes.");
 
         // Check that MACPayload length is below the allowed maximum
         uint32_t pktSize = packet->GetSize();
@@ -617,6 +621,7 @@ EndDeviceLorawanMac::GetNextTransmissionDelay()
     NS_LOG_FUNCTION_NOARGS();
 
     //    Check duty cycle    //
+
 
     // Pick a random channel to transmit on
     std::vector<Ptr<LogicalLoraChannel>> logicalChannels;

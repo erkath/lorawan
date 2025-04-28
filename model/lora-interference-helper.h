@@ -188,6 +188,22 @@ class LoraInterferenceHelper
      */
     uint8_t IsDestroyedByInterference(Ptr<LoraInterferenceHelper::Event> event);
 
+
+    /**
+     * Check if a packet with the given parameters will be destroyed by interference.
+     * Similar to IsDestroyedByInterference, but without creating an Event.
+     *
+     * @param duration Packet duration (Time).
+     * @param rxPower Received signal power (dBm).
+     * @param sf Spreading Factor to use (7-12).
+     * @param frequency Frequency (MHz).
+     * @return true if the packet is likely to be destroyed by interference.
+     */
+    uint8_t PotentiallyDestroyedByInterference(Time duration,
+                                               double rxPowerDbm,
+                                               uint8_t sf,
+                                               double frequency);
+
     /**
      * Compute the time duration in which two given events are overlapping.
      *

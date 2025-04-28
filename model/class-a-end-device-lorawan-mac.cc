@@ -72,7 +72,9 @@ ClassAEndDeviceLorawanMac::SendToPhy(Ptr<Packet> packetToSend)
     // Add headers, prepare TX parameters and send the packet
     /////////////////////////////////////////////////////////
 
-    NS_LOG_DEBUG("PacketToSend: " << packetToSend);
+//    NS_LOG_DEBUG("PacketToSend: " << packetToSend);
+    // TODO: delete me
+    NS_LOG_WARN("PacketToSend: " << packetToSend);
 
     // Data rate adaptation as in LoRaWAN specification, V1.0.2 (2016)
     if (m_enableDRAdapt && (m_dataRate > 0) && (m_retxParams.retxLeft < m_maxNumbTx) &&
@@ -320,6 +322,7 @@ ClassAEndDeviceLorawanMac::CloseFirstReceiveWindow()
     switch (phy->GetState())
     {
     case EndDeviceLoraPhy::TX:
+        // TODO: раскомменть!!!!!!
         NS_ABORT_MSG("PHY was in TX mode when attempting to close a receive window.");
         break;
     case EndDeviceLoraPhy::RX:

@@ -6,29 +6,26 @@
  * Author: Davide Magrin <magrinda@dei.unipd.it>
  */
 
-#include "ns3/basic-energy-source-helper.h"
+/*
+ * This script simulates a complex scenario with multiple gateways and end
+ * devices. The metric of interest for this script is the throughput of the
+ * network.
+ */
+
 #include "ns3/building-allocator.h"
 #include "ns3/building-penetration-loss.h"
 #include "ns3/buildings-helper.h"
-#include "ns3/callback.h"
+#include "ns3/class-a-end-device-lorawan-mac.h"
 #include "ns3/command-line.h"
 #include "ns3/constant-position-mobility-model.h"
 #include "ns3/correlated-shadowing-propagation-loss-model.h"
 #include "ns3/double.h"
 #include "ns3/end-device-lora-phy.h"
-#include "ns3/end-device-lorawan-mac.h"
-#include "ns3/file-helper.h"
 #include "ns3/forwarder-helper.h"
 #include "ns3/gateway-lora-phy.h"
 #include "ns3/gateway-lorawan-mac.h"
 #include "ns3/log.h"
-#include "ns3/lora-device-address.h"
-#include "ns3/lora-frame-header.h"
 #include "ns3/lora-helper.h"
-#include "ns3/lora-net-device.h"
-#include "ns3/lora-phy.h"
-#include "ns3/lora-radio-energy-model-helper.h"
-#include "ns3/lorawan-mac-header.h"
 #include "ns3/mobility-helper.h"
 #include "ns3/network-server-helper.h"
 #include "ns3/node-container.h"
@@ -44,57 +41,19 @@
 using namespace ns3;
 using namespace lorawan;
 
-NS_LOG_COMPONENT_DEFINE("AlohaThroughput");
+NS_LOG_COMPONENT_DEFINE("ComplexLorawanNetworkExample");
 
 // Network settings
 int nDevices = 200;                 //!< Number of end device nodes to create
 int nGateways = 1;                  //!< Number of gateway nodes to create
-double radiusMeters = 80;         //!< Radius (m) of the deployment
-double simulationTimeSeconds = 100; //!< Scenario duration (s) in simulated time
-
-// double simulationTimeSeconds = 500; //!< Scenario duration (s) in simulated time
+double radiusMeters = 6400;         //!< Radius (m) of the deployment
+double simulationTimeSeconds = 600; //!< Scenario duration (s) in simulated time
 
 // Channel model
-// TODO: было false
 bool realisticChannelModel = true; //!< Whether to use a more realistic channel model with
-                                    //!< buildings and correlated shadowing
+                                    //!< Buildings and correlated shadowing
 
-/** Record received pkts by Data Rate (DR) [index 0 -> DR5, index 5 -> DR0]. */
-auto packetsSent = std::vector<int>(6, 0);
-/** Record received pkts by Data Rate (DR) [index 0 -> DR5, index 5 -> DR0]. */
-auto packetsReceived = std::vector<int>(6, 0);
-/**  CAD */
-bool csmaEnabled = false;
-
-/**
- * Record the beginning of a transmission by an end device.
- *
- * \param packet A pointer to the packet sent.
- * \param senderNodeId Node id of the sender end device.
- */
-void
-OnTransmissionCallback(Ptr<const Packet> packet, uint32_t senderNodeId)
-{
-//    NS_LOG_FUNCTION(packet << senderNodeId);
-    LoraTag tag;
-    packet->PeekPacketTag(tag);
-    packetsSent.at(tag.GetSpreadingFactor() - 7)++;
-}
-
-/**
- * Record the correct reception of a packet by a gateway.
- *
- * \param packet A pointer to the packet received.
- * \param receiverNodeId Node id of the receiver gateway.
- */
-void
-OnPacketReceptionCallback(Ptr<const Packet> packet, uint32_t receiverNodeId)
-{
-//    NS_LOG_FUNCTION(packet << receiverNodeId);
-    LoraTag tag;
-    packet->PeekPacketTag(tag);
-    packetsReceived.at(tag.GetSpreadingFactor() - 7)++;
-}
+int appPeriodSeconds = 600; //!< Duration (s) of the inter-transmission time of end devices
 
 // Output control
 bool printBuildingInfo = true; //!< Whether to print building information
@@ -102,49 +61,50 @@ bool printBuildingInfo = true; //!< Whether to print building information
 int
 main(int argc, char* argv[])
 {
-    std::string interferenceMatrix = "aloha";
     CommandLine cmd(__FILE__);
     cmd.AddValue("nDevices", "Number of end devices to include in the simulation", nDevices);
-    cmd.AddValue("simulationTime", "Simulation Time (s)", simulationTimeSeconds);
-    cmd.AddValue("interferenceMatrix",
-                 "Interference matrix to use [aloha, goursaud]",
-                 interferenceMatrix);
-    cmd.AddValue("radius", "Radius (m) of the deployment", radiusMeters);
-    cmd.AddValue("CsmaEnabled", "ns3::EndDeviceLorawanMac::CsmaEnabled");
-    cmd.AddValue("filePostfix", "", csmaEnabled);
-
+    cmd.AddValue("radius", "The radius (m) of the area to simulate", radiusMeters);
+    cmd.AddValue("realisticChannel",
+                 "Whether to use a more realistic channel model",
+                 realisticChannelModel);
+    cmd.AddValue("simulationTime", "The time (s) for which to simulate", simulationTimeSeconds);
+    cmd.AddValue("appPeriod",
+                 "The period in seconds to be used by periodically transmitting applications",
+                 appPeriodSeconds);
+    cmd.AddValue("print", "Whether or not to print building information", printBuildingInfo);
     cmd.Parse(argc, argv);
 
-    int appPeriodSeconds = 10;
-
     // Set up logging
-        LogComponentEnable("AlohaThroughput", LOG_LEVEL_ALL);
-    //
-    //    LogComponentEnable("LoraPhy", LOG_LEVEL_ALL);
-    //    LogComponentEnable("LoraChannel", LOG_LEVEL_ALL);
-    //    LogComponentEnable("EndDeviceLoraPhy", LOG_LEVEL_ALL);
-    //    //     LogComponentEnable("LogicalLoraChannelHelper", LOG_LEVEL_ALL);
-        LogComponentEnable("EndDeviceLorawanMac", LOG_LEVEL_INFO);
-        LogComponentEnable("ClassAEndDeviceLorawanMac", LOG_LEVEL_WARN);
-//        LogComponentEnable("LoraInterferenceHelper", LOG_LEVEL_ALL);
-//        LogComponentEnable("LoraInterferenceHelper", LOG_LEVEL_INFO);
-    //    LogComponentEnable("LorawanMacHelper", LOG_LEVEL_ALL);
-
-    // Make all devices use SF7 (i.e., DR5)
-    //     Config::SetDefault ("ns3::EndDeviceLorawanMac::DataRate", UintegerValue (5));
-
-    if (interferenceMatrix == "aloha")
-    {
-        LoraInterferenceHelper::collisionMatrix = LoraInterferenceHelper::ALOHA;
-    }
-    else if (interferenceMatrix == "goursaud")
-    {
-        LoraInterferenceHelper::collisionMatrix = LoraInterferenceHelper::GOURSAUD;
-    }
+    LogComponentEnable("ComplexLorawanNetworkExample", LOG_LEVEL_ALL);
+    // LogComponentEnable("LoraChannel", LOG_LEVEL_INFO);
+    // LogComponentEnable("LoraPhy", LOG_LEVEL_ALL);
+    // LogComponentEnable("EndDeviceLoraPhy", LOG_LEVEL_ALL);
+    // LogComponentEnable("GatewayLoraPhy", LOG_LEVEL_ALL);
+    // LogComponentEnable("LoraInterferenceHelper", LOG_LEVEL_ALL);
+    // LogComponentEnable("LorawanMac", LOG_LEVEL_ALL);
+    // LogComponentEnable("EndDeviceLorawanMac", LOG_LEVEL_ALL);
+    // LogComponentEnable("ClassAEndDeviceLorawanMac", LOG_LEVEL_ALL);
+    // LogComponentEnable("GatewayLorawanMac", LOG_LEVEL_ALL);
+    // LogComponentEnable("LogicalLoraChannelHelper", LOG_LEVEL_ALL);
+    // LogComponentEnable("LogicalLoraChannel", LOG_LEVEL_ALL);
+    // LogComponentEnable("LoraHelper", LOG_LEVEL_ALL);
+    // LogComponentEnable("LoraPhyHelper", LOG_LEVEL_ALL);
+    // LogComponentEnable("LorawanMacHelper", LOG_LEVEL_ALL);
+    // LogComponentEnable("PeriodicSenderHelper", LOG_LEVEL_ALL);
+    // LogComponentEnable("PeriodicSender", LOG_LEVEL_ALL);
+    // LogComponentEnable("LorawanMacHeader", LOG_LEVEL_ALL);
+    // LogComponentEnable("LoraFrameHeader", LOG_LEVEL_ALL);
+    // LogComponentEnable("NetworkScheduler", LOG_LEVEL_ALL);
+    // LogComponentEnable("NetworkServer", LOG_LEVEL_ALL);
+    // LogComponentEnable("NetworkStatus", LOG_LEVEL_ALL);
+    // LogComponentEnable("NetworkController", LOG_LEVEL_ALL);
 
     /***********
      *  Setup  *
      ***********/
+
+    // Create the time value from the period
+    Time appPeriod = Seconds(appPeriodSeconds);
 
     // Mobility
     MobilityHelper mobility;
@@ -155,7 +115,6 @@ main(int argc, char* argv[])
                                   DoubleValue(0.0),
                                   "Y",
                                   DoubleValue(0.0));
-//    mobility.SetMobilityModel("ns3::MobilityBuildingInfo");
     mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
 
     /************************
@@ -166,7 +125,6 @@ main(int argc, char* argv[])
     Ptr<LogDistancePropagationLossModel> loss = CreateObject<LogDistancePropagationLossModel>();
     loss->SetPathLossExponent(3.76);
     loss->SetReference(1, 7.7);
-
 
     if (realisticChannelModel)
     {
@@ -197,11 +155,11 @@ main(int argc, char* argv[])
 
     // Create the LorawanMacHelper
     LorawanMacHelper macHelper = LorawanMacHelper();
-    macHelper.SetRegion(LorawanMacHelper::ALOHA);
 
     // Create the LoraHelper
     LoraHelper helper = LoraHelper();
     helper.EnablePacketTracking(); // Output filename
+    // helper.EnableSimulationTimePrinting ();
 
     // Create the NetworkServerHelper
     NetworkServerHelper nsHelper = NetworkServerHelper();
@@ -239,7 +197,7 @@ main(int argc, char* argv[])
     macHelper.SetAddressGenerator(addrGen);
     phyHelper.SetDeviceType(LoraPhyHelper::ED);
     macHelper.SetDeviceType(LorawanMacHelper::ED_A);
-    NetDeviceContainer endDevicesNetDevices = helper.Install(phyHelper, macHelper, endDevices);
+    helper.Install(phyHelper, macHelper, endDevices);
 
     // Now end devices are connected to the channel
 
@@ -324,6 +282,12 @@ main(int argc, char* argv[])
         myfile.close();
     }
 
+    /**********************************************
+     *  Set up the end device's spreading factor  *
+     **********************************************/
+
+    LorawanMacHelper::SetSpreadingFactorsUp(endDevices, gateways, channel);
+
     NS_LOG_DEBUG("Completed configuration");
 
     /*********************************************
@@ -331,57 +295,18 @@ main(int argc, char* argv[])
      *********************************************/
 
     Time appStopTime = Seconds(simulationTimeSeconds);
-    int packetSize = 50;
-
     PeriodicSenderHelper appHelper = PeriodicSenderHelper();
-    appHelper.SetPacketSize(packetSize);
-
-    ApplicationContainer appContainer{};
-
-    // Разброс периодов
-    for (int i = 0; i < nDevices; ++i)
-    {
-        appHelper.SetPeriod(Seconds((double)appPeriodSeconds / 2 +
-                                    (double)appPeriodSeconds / 2 * (double)i / (double)nDevices));
-        appContainer.Add(appHelper.Install(endDevices));
-    }
+    appHelper.SetPeriod(Seconds(appPeriodSeconds));
+    appHelper.SetPacketSize(23);
+    Ptr<RandomVariableStream> rv =
+        CreateObjectWithAttributes<UniformRandomVariable>("Min",
+                                                          DoubleValue(0),
+                                                          "Max",
+                                                          DoubleValue(10));
+    ApplicationContainer appContainer = appHelper.Install(endDevices);
 
     appContainer.Start(Seconds(0));
     appContainer.Stop(appStopTime);
-
-    std::ofstream outputFile;
-    // Delete contents of the file as it is opened
-    outputFile.open("durations.txt", std::ofstream::out | std::ofstream::trunc);
-    for (uint8_t sf = 7; sf <= 12; sf++)
-    {
-        LoraTxParameters txParams;
-        txParams.sf = sf;
-        txParams.headerDisabled = false;
-        txParams.codingRate = 1;
-        txParams.bandwidthHz = 125000;
-        txParams.nPreamble = 8;
-        txParams.crcEnabled = true;
-        txParams.lowDataRateOptimizationEnabled = LoraPhy::GetTSym(txParams) > MilliSeconds(16);
-        Ptr<Packet> pkt = Create<Packet>(packetSize);
-
-        LoraFrameHeader frameHdr = LoraFrameHeader();
-        frameHdr.SetAsUplink();
-        frameHdr.SetFPort(1);
-        frameHdr.SetAddress(LoraDeviceAddress());
-        frameHdr.SetAdr(false);
-//        frameHdr.SetAdr(true);
-        frameHdr.SetAdrAckReq(false);
-        frameHdr.SetFCnt(0);
-        pkt->AddHeader(frameHdr);
-
-        LorawanMacHeader macHdr = LorawanMacHeader();
-        macHdr.SetMType(LorawanMacHeader::UNCONFIRMED_DATA_UP);
-        macHdr.SetMajor(1);
-        pkt->AddHeader(macHdr);
-
-        outputFile << LoraPhy::GetOnAirTime(pkt, txParams).GetMicroSeconds() << " ";
-    }
-    outputFile.close();
 
     /**************************
      *  Create network server  *
@@ -411,82 +336,6 @@ main(int argc, char* argv[])
     // Create a forwarder for each gateway
     forHelper.Install(gateways);
 
-    // Install trace sources
-    for (auto node = gateways.Begin(); node != gateways.End(); node++)
-    {
-        DynamicCast<LoraNetDevice>((*node)->GetDevice(0))
-            ->GetPhy()
-            ->TraceConnectWithoutContext("ReceivedPacket", MakeCallback(OnPacketReceptionCallback));
-    }
-
-    // Install trace sources
-    for (auto node = endDevices.Begin(); node != endDevices.End(); node++)
-    {
-        DynamicCast<LoraNetDevice>((*node)->GetDevice(0))
-            ->GetPhy()
-            ->TraceConnectWithoutContext("StartSending", MakeCallback(OnTransmissionCallback));
-    }
-
-    LorawanMacHelper::SetSpreadingFactorsUp(endDevices, gateways, channel);
-
-    /************************
-     * Install Energy Model *
-     ************************/
-
-    BasicEnergySourceHelper basicSourceHelper;
-    LoraRadioEnergyModelHelper radioEnergyHelper;
-
-    // configure energy source
-    basicSourceHelper.Set("BasicEnergySourceInitialEnergyJ", DoubleValue(10000)); // Energy in J
-    basicSourceHelper.Set("BasicEnergySupplyVoltageV", DoubleValue(3.3));
-
-    radioEnergyHelper.Set("StandbyCurrentA", DoubleValue(0.0014));
-    radioEnergyHelper.Set("TxCurrentA", DoubleValue(0.028));
-    radioEnergyHelper.Set("SleepCurrentA", DoubleValue(0.0000015));
-    radioEnergyHelper.Set("RxCurrentA", DoubleValue(0.0112));
-
-    radioEnergyHelper.SetTxCurrentModel("ns3::ConstantLoraTxCurrentModel",
-                                        "TxCurrent",
-                                        DoubleValue(0.028));
-
-    // install source on end devices' nodes
-    EnergySourceContainer sources = basicSourceHelper.Install(endDevices);
-
-    uint32_t step = sources.GetN() / 5;
-
-    for (uint32_t i = 0; i < sources.GetN(); i += step)
-    {
-        Names::Add("/Names/EnergySource" + std::to_string(i), sources.Get(i));
-    }
-
-    std::cout << "Size: " << sources.GetN() << std::endl;
-
-    // install device model
-    DeviceEnergyModelContainer deviceModels =
-        radioEnergyHelper.Install(endDevicesNetDevices, sources);
-
-    /**************
-     * Get output *
-     **************/
-
-    std::vector<std::string> energySourceNames;
-    for (uint32_t i = 0; i < sources.GetN(); i += step)
-    {
-        energySourceNames.push_back("/Names/EnergySource" + std::to_string(i) + "/RemainingEnergy");
-    }
-
-    std::string cadFlag = csmaEnabled ? "cad" : "without_cad";
-
-    FileHelper fileHelper; //    fileHelper.ConfigureFile("battery-level-without-cad-" +
-                           //    std::to_string(nDevices),
-    //    FileAggregator::SPACE_SEPARATED);
-    fileHelper.ConfigureFile("battery-level-" + cadFlag + "-" + std::to_string(simulationTimeSeconds) + "" + std::to_string(nDevices),
-                             FileAggregator::SPACE_SEPARATED);
-    //    fileHelper.Set2dFormat("Time (Seconds) = %.3e\tEnergy Level = %.0f");
-    fileHelper.WriteProbeArray("ns3::DoubleProbe", energySourceNames, "Output");
-    //    fileHelper.WriteProbe("ns3::DoubleProbe", "/Names/EnergySource1/RemainingEnergy",
-    //    "Output");
-
     ////////////////
     // Simulation //
     ////////////////
@@ -498,17 +347,13 @@ main(int argc, char* argv[])
 
     Simulator::Destroy();
 
-    /////////////////////////////
-    // Print results to stdout //
-    /////////////////////////////
+    ///////////////////////////
+    // Print results to file //
+    ///////////////////////////
     NS_LOG_INFO("Computing performance metrics...");
 
-    for (int i = 0; i < 6; i++)
-    {
-        std::cout << "Packet sent at SF=" << i + 7 << ": " << packetsSent.at(i) << " ;"
-                  << "Packet received at SF=" << i + 7 << ": " << packetsReceived.at(i)
-                  << std::endl;
-    }
+    LoraPacketTracker& tracker = helper.GetPacketTracker();
+    std::cout << tracker.CountMacPacketsGlobally(Seconds(0), appStopTime + Hours(1)) << std::endl;
 
     return 0;
 }

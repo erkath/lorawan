@@ -162,6 +162,16 @@ class LoraPhy : public Object
      */
     virtual bool IsTransmitting() = 0;
 
+
+    /**
+     * Установка и получение чувствительности приёмника
+     *
+     */
+    double GetRxSensitivity() const;
+
+    void SetRxSensitivity (double sensitivity);
+
+
     /**
      * Whether this device is listening on the specified frequency or not.
      *

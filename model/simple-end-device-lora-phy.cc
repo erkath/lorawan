@@ -55,12 +55,23 @@ SimpleEndDeviceLoraPhy::Send(Ptr<Packet> packet,
 
     NS_LOG_INFO("Current state: " << m_state);
 
+    // TODO: ?????
+//    if (m_state == CCA)
+//    {
+//        NS_LOG_INFO("Cannot send because device is currently in CCA mode");
+//        return;
+//    }
+
     // We must be either in STANDBY or SLEEP mode to send a packet
     if (m_state != STANDBY && m_state != SLEEP && m_state != CCA)
     {
         NS_LOG_INFO("Cannot send because device is currently not in STANDBY, SLEEP or CCA mode");
         return;
     }
+
+//    if (m_channel->GetRxPower())
+//        // TODO: на самом деле надо попытаться декодировать какой-то пакет на протяжении какого-то времени
+//        // Если наш SF, то ждем.
 
     // Compute the duration of the transmission
     Time duration = GetOnAirTime(packet, txParams);
@@ -188,6 +199,7 @@ SimpleEndDeviceLoraPhy::StartReceive(Ptr<Packet> packet,
 
         // Check Sensitivity
         ////////////////////
+        // Note: тут дропается пакет со слишком низким уровнем сигнала
         if (rxPowerDbm < sensitivity)
         {
             NS_LOG_INFO("Dropping packet reception of packet with sf = "

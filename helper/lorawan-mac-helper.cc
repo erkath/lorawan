@@ -443,6 +443,32 @@ LorawanMacHelper::ApplyCommonSingleChannelConfigurations(Ptr<LorawanMac> lorawan
 }
 
 std::vector<int>
+LorawanMacHelper::SetSimilarSpreadingFactorsUp(NodeContainer endDevices)
+{
+    NS_LOG_FUNCTION_NOARGS();
+
+    std::vector<int> sfQuantity(7, 0);
+    for (auto j = endDevices.Begin(); j != endDevices.End(); ++j)
+    {
+        Ptr<Node> object = *j;
+        Ptr<MobilityModel> position = object->GetObject<MobilityModel>();
+        NS_ASSERT(position);
+        Ptr<NetDevice> netDevice = object->GetDevice(0);
+        Ptr<LoraNetDevice> loraNetDevice = DynamicCast<LoraNetDevice>(netDevice);
+        NS_ASSERT(loraNetDevice);
+        Ptr<ClassAEndDeviceLorawanMac> mac =
+            DynamicCast<ClassAEndDeviceLorawanMac>(loraNetDevice->GetMac());
+        NS_ASSERT(mac);
+
+        mac->SetDataRate(0);
+        NS_LOG_FUNCTION("э куда офигел");
+        sfQuantity[6] = sfQuantity[6] + 1;
+    }
+
+    return sfQuantity;
+}
+
+std::vector<int>
 LorawanMacHelper::SetSpreadingFactorsUp(NodeContainer endDevices,
                                         NodeContainer gateways,
                                         Ptr<LoraChannel> channel)
@@ -484,7 +510,7 @@ LorawanMacHelper::SetSpreadingFactorsUp(NodeContainer endDevices,
             }
         }
 
-        // NS_LOG_DEBUG ("Rx Power: " << highestRxPower);
+         NS_LOG_DEBUG ("Rx Power: " << highestRxPower << " *edSensitivity " << *EndDeviceLoraPhy::sensitivity);
         double rxPower = highestRxPower;
 
         // Get the end device sensitivity
@@ -523,7 +549,7 @@ LorawanMacHelper::SetSpreadingFactorsUp(NodeContainer endDevices,
         }
         else // Device is out of range. Assign SF12.
         {
-            // NS_LOG_DEBUG ("Device out of range");
+             NS_LOG_DEBUG ("Device out of range");
             mac->SetDataRate(0);
             sfQuantity[6] = sfQuantity[6] + 1;
             // NS_LOG_DEBUG ("sfQuantity[6] = " << sfQuantity[6]);

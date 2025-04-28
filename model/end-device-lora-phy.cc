@@ -209,6 +209,10 @@ void
 EndDeviceLoraPhy::RegisterListener(EndDeviceLoraPhyListener* listener)
 {
     m_listeners.push_back(listener);
+    // TODO
+    if (IsInitialized())
+    {
+    }
 }
 
 void

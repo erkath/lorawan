@@ -65,6 +65,7 @@ OneShotSender::SendPacket()
     NS_LOG_FUNCTION(this);
 
     // Create and send a new packet
+//    Ptr<Packet> packet = Create<Packet>(1 * 1024 /8 - 8);
     Ptr<Packet> packet = Create<Packet>(10);
     m_mac->Send(packet);
 }
