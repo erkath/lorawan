@@ -37,7 +37,6 @@ LoraInterferenceHelper::Event::Event(Time duration,
       m_packet(packet),
       m_frequencyMHz(frequencyMHz)
 {
-    // TODO: сюда можно воткнуть логирование, чтобы понимать, когда у нас пакеты будут интерферировать
     // NS_LOG_FUNCTION_NOARGS ();
 }
 
@@ -66,11 +65,7 @@ LoraInterferenceHelper::Event::GetDuration() const
     return m_endTime - m_startTime;
 }
 
-/**
- * Note: rxPower -- скорее всего тот самый уровень энергии, который должен быть больше
- * некоторого порога (sensitivity)
- * @return
- */
+
 double
 LoraInterferenceHelper::Event::GetRxPowerdBm() const
 {
@@ -262,7 +257,6 @@ LoraInterferenceHelper::PotentiallyDestroyedByInterference(Time duration,
                                                            uint8_t sf,
                                                            double frequency)
 {
-    // TODO: переписать
 
     Time now = Simulator::Now();
     Time packetStartTime = now;

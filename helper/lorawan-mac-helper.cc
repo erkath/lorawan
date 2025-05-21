@@ -461,7 +461,6 @@ LorawanMacHelper::SetSimilarSpreadingFactorsUp(NodeContainer endDevices)
         NS_ASSERT(mac);
 
         mac->SetDataRate(0);
-        NS_LOG_FUNCTION("э куда офигел");
         sfQuantity[6] = sfQuantity[6] + 1;
     }
 

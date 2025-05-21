@@ -320,7 +320,6 @@ ClassAEndDeviceLorawanMac::CloseFirstReceiveWindow()
     switch (phy->GetState())
     {
     case EndDeviceLoraPhy::TX:
-        // TODO: раскомменть!!!!!!
         NS_ABORT_MSG("PHY was in TX mode when attempting to close a receive window.");
         break;
     case EndDeviceLoraPhy::RX:

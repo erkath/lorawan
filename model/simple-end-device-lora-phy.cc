@@ -70,8 +70,6 @@ SimpleEndDeviceLoraPhy::Send(Ptr<Packet> packet,
     }
 
 //    if (m_channel->GetRxPower())
-//        // TODO: на самом деле надо попытаться декодировать какой-то пакет на протяжении какого-то времени
-//        // Если наш SF, то ждем.
 
     // Compute the duration of the transmission
     Time duration = GetOnAirTime(packet, txParams);
@@ -199,7 +197,6 @@ SimpleEndDeviceLoraPhy::StartReceive(Ptr<Packet> packet,
 
         // Check Sensitivity
         ////////////////////
-        // Note: тут дропается пакет со слишком низким уровнем сигнала
         if (rxPowerDbm < sensitivity)
         {
             NS_LOG_INFO("Dropping packet reception of packet with sf = "

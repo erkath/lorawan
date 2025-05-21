@@ -65,7 +65,7 @@ LoraPhy::GetTypeId()
                             "ns3::Packet::TracedCallback")
             .AddAttribute("RxSensitivity",
                           "The sensitivity of the receiver in dBm.",
-                          DoubleValue(-120.0), // Значение по умолчанию
+                          DoubleValue(-120.0),
                           MakeDoubleAccessor(&LoraPhy::m_rxSensitivity),
                           MakeDoubleChecker<double>());
     return tid;
@@ -178,10 +178,9 @@ Time
 LoraPhy::GetCADTime(LoraTxParameters txParams)
 {
     // Compute the symbol duration
-    // Bandwidth in Hz
     double tSym = GetTSym(txParams).GetSeconds();
 
-    // bandwidthHz в герцах
+    // bandwidthHz [Hz]
     return Seconds(tSym + 32 / txParams.bandwidthHz);
 }
 
@@ -243,23 +242,21 @@ operator<<(std::ostream& os, const LoraTxParameters& params)
 
 
 /**
- * Попытка посмотреть на занятость канала.
- * Вообще мы должны пытаться прочитать преамбулу с нужным SF.
+ * Checking channel occupancy.
+ * In general, we should attempt to detect the preamble with the required SF.
  *
- * TODO. Сейчас преамбула в отдельности нигде не декодируется. Сразу читается весь пакет
- * Сейчас проверяется а) уровень сигнала б) интерференция
- * Это же происходит в методе StartReceive во время определения, потерян ли пакет
- *
+ * Currently, we check the potential interference of packet.
+ * This is also handled in the StartReceive method when determining whether a packet is lost.
  */
 bool LoraPhy::CheckChannelActivity(Ptr<Packet> packet,
                                        LoraTxParameters txParams,
                                        double frequencyMHz,
                                        double txPowerDbm)
 {
-    // TODO
+
 //    if (txPowerDbm < m_rxSensitivity) {
 //        NS_LOG_INFO("Signal too weak for transmission");
-//        return false; // (сигнал ниже чувствительности)
+//        return false;
 //    }
     // Compute the CAD duration
     Time cadDuration = LoraPhy::GetCADTime(txParams);
@@ -268,8 +265,6 @@ bool LoraPhy::CheckChannelActivity(Ptr<Packet> packet,
                 " SF: " << unsigned(txParams.sf) <<
                 " frequencyMHz: " << frequencyMHz <<
                 " CAD duration: " << cadDuration);
-//    std::cerr << "Channel activity detection. Packet: " << packet << txPowerDbm << unsigned(txParams.sf) << frequencyMHz << duration;
-//    std::cerr << "Enabled? " << g_log.IsEnabled(ns3::LOG_ERROR) << std::endl;
 
     uint8_t isPotentiallyDestroyed = m_interference.PotentiallyDestroyedByInterference(cadDuration,
                                                                               txPowerDbm,

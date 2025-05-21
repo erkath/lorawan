@@ -157,7 +157,6 @@ EndDeviceLorawanMac::CheckActivityDetection(Ptr<Packet> packet,
                                                    frequencyMHz,
                                                    m_txPower);
 
-    // TODO: уровень сигнала
 
 //    NS_ASSERT_MSG(m_txPower < m_phy->GetRxSensitivity(),
 //                  " Transmitted signal will be to weak to process");
@@ -194,7 +193,6 @@ EndDeviceLorawanMac::SendNoNextDelay(Ptr<Packet> packet)
     // If it is not possible to transmit now because of the duty cycle,
     // or because we are receiving, schedule a tx/retx later
 
-    // TODO: дублирование кода
     // Craft LoraTxParameters object
     LoraTxParameters params;
     params.sf = GetSfFromDataRate(m_dataRate);
@@ -207,9 +205,6 @@ EndDeviceLorawanMac::SendNoNextDelay(Ptr<Packet> packet)
 
 
     // Pick a channel on which to transmit the packet
-    // TODO: LogicalLoraChannel это как раз один из 4 возможных каналов в разрешенном диапазоне (?)
-    //  и тут вернется nullptr, если подходящего канала не будет
-    // duty cycle видимо
     Ptr<LogicalLoraChannel> txChannel = GetChannelForTx();
 
     if (!(txChannel && m_retxParams.retxLeft > 0))
@@ -235,7 +230,6 @@ EndDeviceLorawanMac::SendNoNextDelay(Ptr<Packet> packet)
         if (!m_CsmaEnabled) {
             DoSend(packet);
         } else {
-            // WIP проверка состояния канала.
             CheckChannelActivityAndDoSend(packet, params, txChannel);
         }
     }
@@ -292,11 +286,6 @@ EndDeviceLorawanMac::postponeTransmissionBecauseOfCAD(Ptr<Packet> packet,
                 << backoffTime.GetSeconds() << "." << " CW=" << cw << ";");
 }
 
-/**
- * По идее это история про duty cycle
- * @param netxTxDelay
- * @param packet
- */
 void
 EndDeviceLorawanMac::postponeTransmission(Time netxTxDelay, Ptr<Packet> packet)
 {

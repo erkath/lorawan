@@ -343,7 +343,6 @@ main(int argc, char* argv[])
 
    ApplicationContainer appContainer{};
 
-   // Разброс периодов
    for (int i = 0; i < nDevices; ++i)
    {
        appHelper.SetPeriod(Seconds((double)appPeriodSeconds / 2 +
