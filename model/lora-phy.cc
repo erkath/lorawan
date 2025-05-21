@@ -8,10 +8,9 @@
 
 #include "lora-phy.h"
 
+#include "ns3/double.h"
 #include "ns3/log.h"
 #include "ns3/simulator.h"
-
-#include "ns3/double.h"
 
 #include <algorithm>
 
@@ -257,6 +256,11 @@ bool LoraPhy::CheckChannelActivity(Ptr<Packet> packet,
                                        double frequencyMHz,
                                        double txPowerDbm)
 {
+    // TODO
+//    if (txPowerDbm < m_rxSensitivity) {
+//        NS_LOG_INFO("Signal too weak for transmission");
+//        return false; // (сигнал ниже чувствительности)
+//    }
     // Compute the CAD duration
     Time cadDuration = LoraPhy::GetCADTime(txParams);
     NS_LOG_DEBUG("Channel activity detection. Packet: " << packet <<
@@ -267,13 +271,11 @@ bool LoraPhy::CheckChannelActivity(Ptr<Packet> packet,
 //    std::cerr << "Channel activity detection. Packet: " << packet << txPowerDbm << unsigned(txParams.sf) << frequencyMHz << duration;
 //    std::cerr << "Enabled? " << g_log.IsEnabled(ns3::LOG_ERROR) << std::endl;
 
-    uint8_t isChannelFree = m_interference.PotentiallyDestroyedByInterference(cadDuration,
+    uint8_t isPotentiallyDestroyed = m_interference.PotentiallyDestroyedByInterference(cadDuration,
                                                                               txPowerDbm,
                                                                               txParams.sf,
                                                                               frequencyMHz);
-    // наш пакет потенциально не съедается интерференцией и его мощность достаточна, IsDestroyedByInterference = 0
-    return isChannelFree == 0;
-    // TODO: уровень сигнала?
+    return isPotentiallyDestroyed == 0;
 }
 
 double

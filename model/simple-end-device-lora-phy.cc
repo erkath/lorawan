@@ -56,16 +56,16 @@ SimpleEndDeviceLoraPhy::Send(Ptr<Packet> packet,
     NS_LOG_INFO("Current state: " << m_state);
 
     // TODO: ?????
-//    if (m_state == CCA)
-//    {
-//        NS_LOG_INFO("Cannot send because device is currently in CCA mode");
-//        return;
-//    }
+    if (m_state == CCA)
+    {
+        NS_LOG_INFO("Cannot send because device is currently in CCA mode");
+        return;
+    }
 
     // We must be either in STANDBY or SLEEP mode to send a packet
-    if (m_state != STANDBY && m_state != SLEEP && m_state != CCA)
+    if (m_state != STANDBY && m_state != SLEEP)
     {
-        NS_LOG_INFO("Cannot send because device is currently not in STANDBY, SLEEP or CCA mode");
+        NS_LOG_INFO("Cannot send because device is currently not in STANDBY or SLEEP mode");
         return;
     }
 
@@ -238,6 +238,7 @@ SimpleEndDeviceLoraPhy::StartReceive(Ptr<Packet> packet,
         }
     }
     case CCA:
+        NS_LOG_WARN("Dropping packet because device is in CCA state");
         break;
     }
 }

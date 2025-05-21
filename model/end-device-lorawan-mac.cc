@@ -158,7 +158,7 @@ EndDeviceLorawanMac::CheckActivityDetection(Ptr<Packet> packet,
                                                    m_txPower);
 
     // TODO: уровень сигнала
-    NS_LOG_INFO("CAD. Check is: " << check);
+
 //    NS_ASSERT_MSG(m_txPower < m_phy->GetRxSensitivity(),
 //                  " Transmitted signal will be to weak to process");
     return check;
@@ -167,14 +167,17 @@ EndDeviceLorawanMac::CheckActivityDetection(Ptr<Packet> packet,
 void EndDeviceLorawanMac::CheckChannelActivityAndDoSend(Ptr<Packet> packet,
                                                        LoraTxParameters params,
                                                        Ptr<LogicalLoraChannel> txChannel) {
-    NS_LOG_INFO("CAD. Checking channel state");
+    NS_LOG_INFO("CAD. Checking channel state. Packet " << packet);
+    if (DynamicCast<EndDeviceLoraPhy>(m_phy)->GetState() != EndDeviceLoraPhy::STANDBY
+        && DynamicCast<EndDeviceLoraPhy>(m_phy)->GetState() != EndDeviceLoraPhy::SLEEP) {
+        return;
+    }
     DynamicCast<EndDeviceLoraPhy>(m_phy)->SwitchToCca();
     if (CheckActivityDetection(packet, params, txChannel)) {
-
-
-//        DynamicCast<EndDeviceLoraPhy>(m_phy)->SwitchToStandby();
+        DynamicCast<EndDeviceLoraPhy>(m_phy)->SwitchToStandby();
         NS_LOG_INFO("CAD. Channel is free");
         m_numBackoffRetries = 0;
+        cw = cwMin;
         // in TX in SimpleEndDeviceLoraPhy::Send
         DoSend(packet);
     }
@@ -186,20 +189,22 @@ void EndDeviceLorawanMac::CheckChannelActivityAndDoSend(Ptr<Packet> packet,
 }
 
 void
-EndDeviceLorawanMac::Send(Ptr<Packet> packet)
+EndDeviceLorawanMac::SendNoNextDelay(Ptr<Packet> packet)
 {
-    NS_LOG_FUNCTION(this << packet);
-
-//    std::cout << "AA" << m_CsmaEnabled;
     // If it is not possible to transmit now because of the duty cycle,
     // or because we are receiving, schedule a tx/retx later
 
-    Time netxTxDelay = GetNextTransmissionDelay();
-    if (netxTxDelay != Seconds(0))
-    {
-        postponeTransmission(netxTxDelay, packet);
-        return;
-    }
+    // TODO: дублирование кода
+    // Craft LoraTxParameters object
+    LoraTxParameters params;
+    params.sf = GetSfFromDataRate(m_dataRate);
+    params.headerDisabled = m_headerDisabled;
+    params.codingRate = m_codingRate;
+    params.bandwidthHz = GetBandwidthFromDataRate(m_dataRate);
+    params.nPreamble = m_nPreambleSymbols;
+    params.crcEnabled = true;
+    params.lowDataRateOptimizationEnabled = LoraPhy::GetTSym(params) > MilliSeconds(16);
+
 
     // Pick a channel on which to transmit the packet
     // TODO: LogicalLoraChannel это как раз один из 4 возможных каналов в разрешенном диапазоне (?)
@@ -226,17 +231,6 @@ EndDeviceLorawanMac::Send(Ptr<Packet> packet)
         NS_ASSERT_MSG(m_txPower <= m_channelHelper->GetTxPowerForChannel(txChannel),
                       " The selected power is too high to be supported by this channel.");
 
-        // TODO: дублирование кода
-        // Craft LoraTxParameters object
-        LoraTxParameters params;
-        params.sf = GetSfFromDataRate(m_dataRate);
-        params.headerDisabled = m_headerDisabled;
-        params.codingRate = m_codingRate;
-        params.bandwidthHz = GetBandwidthFromDataRate(m_dataRate);
-        params.nPreamble = m_nPreambleSymbols;
-        params.crcEnabled = true;
-        params.lowDataRateOptimizationEnabled = LoraPhy::GetTSym(params) > MilliSeconds(16);
-
 
         if (!m_CsmaEnabled) {
             DoSend(packet);
@@ -245,6 +239,21 @@ EndDeviceLorawanMac::Send(Ptr<Packet> packet)
             CheckChannelActivityAndDoSend(packet, params, txChannel);
         }
     }
+}
+
+void
+EndDeviceLorawanMac::Send(Ptr<Packet> packet)
+{
+    NS_LOG_FUNCTION(this << packet);
+
+    Time netxTxDelay = GetNextTransmissionDelay();
+    if (netxTxDelay != Seconds(0))
+    {
+        postponeTransmission(netxTxDelay, packet);
+        return;
+    }
+
+    SendNoNextDelay(packet);
 }
 
 
@@ -277,14 +286,11 @@ EndDeviceLorawanMac::postponeTransmissionBecauseOfCAD(Ptr<Packet> packet,
 
     // Delete previously scheduled transmissions if any.
     Simulator::Cancel(m_nextTx);
+    m_nextTx = Simulator::Schedule(backoffTime, &EndDeviceLorawanMac::Send, this, packet);
 
-//    m_nextTx = Simulator::Schedule(backoffTime, &EndDeviceLorawanMac::DoSend, this, packet);
-    m_nextTx = Simulator::Schedule(backoffTime, &EndDeviceLorawanMac::CheckChannelActivityAndDoSend, this, packet, params, txChannel);
     NS_LOG_INFO("CAD: channel busy, backing off for "
-                << backoffTime.GetSeconds() << ".");
-
+                << backoffTime.GetSeconds() << "." << " CW=" << cw << ";");
 }
-
 
 /**
  * По идее это история про duty cycle
@@ -297,10 +303,11 @@ EndDeviceLorawanMac::postponeTransmission(Time netxTxDelay, Ptr<Packet> packet)
     NS_LOG_FUNCTION(this);
     // Delete previously scheduled transmissions if any.
     Simulator::Cancel(m_nextTx);
-    m_nextTx = Simulator::Schedule(netxTxDelay, &EndDeviceLorawanMac::DoSend, this, packet);
+
+    m_nextTx = Simulator::Schedule(netxTxDelay, &EndDeviceLorawanMac::Send, this, packet);
     NS_LOG_WARN("Attempting to send, but the aggregate duty cycle won't allow it. Scheduling a tx "
                 "at a delay "
-                << netxTxDelay.GetSeconds() << ".");
+                << netxTxDelay.GetSeconds() << "; packet: " << packet << ".");
 }
 
 void

@@ -54,6 +54,12 @@ LoraRadioEnergyModel::GetTypeId()
                           MakeDoubleAccessor(&LoraRadioEnergyModel::SetSleepCurrentA,
                                              &LoraRadioEnergyModel::GetSleepCurrentA),
                           MakeDoubleChecker<double>())
+            .AddAttribute("CcaCurrentA",
+                          "The radio CCA current in Ampere.",
+                          DoubleValue(0.0112), // sleep mode = 1.5microA
+                          MakeDoubleAccessor(&LoraRadioEnergyModel::SetCcaCurrentA,
+                                             &LoraRadioEnergyModel::GetCcaCurrentA),
+                          MakeDoubleChecker<double>())
             .AddAttribute("TxCurrentModel",
                           "A pointer to the attached tx current model.",
                           PointerValue(),
@@ -161,6 +167,21 @@ LoraRadioEnergyModel::SetSleepCurrentA(double sleepCurrentA)
     m_sleepCurrentA = sleepCurrentA;
 }
 
+
+double
+LoraRadioEnergyModel::GetCcaCurrentA() const
+{
+    NS_LOG_FUNCTION(this);
+    return m_ccaCurrentA;
+}
+
+void
+LoraRadioEnergyModel::SetCcaCurrentA(double ccaCurrentA)
+{
+    NS_LOG_FUNCTION(this << ccaCurrentA);
+    m_sleepCurrentA = ccaCurrentA;
+}
+
 EndDeviceLoraPhy::State
 LoraRadioEnergyModel::GetCurrentState() const
 {
@@ -231,6 +252,7 @@ LoraRadioEnergyModel::ChangeState(int newState)
         energyToDecrease = duration.GetSeconds() * m_sleepCurrentA * supplyVoltage;
         break;
     case EndDeviceLoraPhy::CCA:
+        // TODO
         energyToDecrease = duration.GetSeconds() * m_rxCurrentA * supplyVoltage;
         break;
     default:
@@ -334,6 +356,8 @@ LoraRadioEnergyModel::DoGetCurrentA() const
         return m_rxCurrentA;
     case EndDeviceLoraPhy::SLEEP:
         return m_sleepCurrentA;
+    case EndDeviceLoraPhy::CCA:
+        return m_ccaCurrentA;
     default:
         NS_FATAL_ERROR("LoraRadioEnergyModel:Undefined radio state:" << m_currentState);
     }
@@ -455,7 +479,7 @@ LoraRadioEnergyModelPhyListener::NotifyCcaBusy()
     {
         NS_FATAL_ERROR("LoraRadioEnergyModelPhyListener:Change state callback not set!");
     }
-    m_changeStateCallback(EndDeviceLoraPhy::STANDBY);
+    m_changeStateCallback(EndDeviceLoraPhy::CCA);
 }
 
 /*

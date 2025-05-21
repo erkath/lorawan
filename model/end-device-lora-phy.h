@@ -72,7 +72,6 @@ class EndDeviceLoraPhyListener
 
     /**
      * Notify listeners that someone captured the channel.
-     * Вопрос только, не должно ли это быть свойство канала в таком случае.
      */
     virtual void NotifyCcaBusy() = 0;
 };

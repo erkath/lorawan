@@ -306,6 +306,7 @@ class LoraRadioEnergyModel : public DeviceEnergyModel
     double m_rxCurrentA;    ///< receive current
     double m_idleCurrentA;  ///< idle current
     double m_sleepCurrentA; ///< sleep current
+    double m_ccaCurrentA;   /// < cca current
     // NOTICE VERY WELL: Current  Model linear or constant as possible choices
     Ptr<LoraTxCurrentModel> m_txCurrentModel; ///< current model
 
@@ -327,6 +328,8 @@ class LoraRadioEnergyModel : public DeviceEnergyModel
 
     /// EndDeviceLoraPhy listener
     LoraRadioEnergyModelPhyListener* m_listener;
+    double GetCcaCurrentA() const;
+    void SetCcaCurrentA(double ccaCurrentA);
 };
 
 } // namespace lorawan

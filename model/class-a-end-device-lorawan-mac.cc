@@ -72,9 +72,7 @@ ClassAEndDeviceLorawanMac::SendToPhy(Ptr<Packet> packetToSend)
     // Add headers, prepare TX parameters and send the packet
     /////////////////////////////////////////////////////////
 
-//    NS_LOG_DEBUG("PacketToSend: " << packetToSend);
-    // TODO: delete me
-    NS_LOG_WARN("PacketToSend: " << packetToSend);
+    NS_LOG_DEBUG("PacketToSend: " << packetToSend);
 
     // Data rate adaptation as in LoRaWAN specification, V1.0.2 (2016)
     if (m_enableDRAdapt && (m_dataRate > 0) && (m_retxParams.retxLeft < m_maxNumbTx) &&

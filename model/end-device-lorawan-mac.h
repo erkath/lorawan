@@ -63,6 +63,8 @@ class EndDeviceLorawanMac : public LorawanMac
      */
     virtual void DoSend(Ptr<Packet> packet);
 
+    void SendNoNextDelay(Ptr<Packet> packet);
+
     /**
      * Add headers and send a packet with the sending function of the physical layer.
      *
@@ -497,7 +499,7 @@ class EndDeviceLorawanMac : public LorawanMac
     uint16_t m_currentFCnt;
 
 
-    Time m_slotTime = MicroSeconds(1);
+    Time m_slotTime = MicroSeconds(10000);
     uint32_t cw = 1;                             //!< the current contention window
     uint32_t cwMin = 1;                         //!< the minimum contention window
     uint32_t cwMax = 1000;                         //!< the maximum contention window
