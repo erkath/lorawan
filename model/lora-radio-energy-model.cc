@@ -179,7 +179,7 @@ void
 LoraRadioEnergyModel::SetCcaCurrentA(double ccaCurrentA)
 {
     NS_LOG_FUNCTION(this << ccaCurrentA);
-    m_sleepCurrentA = ccaCurrentA;
+    m_ccaCurrentA = ccaCurrentA;
 }
 
 EndDeviceLoraPhy::State
@@ -252,8 +252,7 @@ LoraRadioEnergyModel::ChangeState(int newState)
         energyToDecrease = duration.GetSeconds() * m_sleepCurrentA * supplyVoltage;
         break;
     case EndDeviceLoraPhy::CCA:
-        // TODO
-        energyToDecrease = duration.GetSeconds() * m_rxCurrentA * supplyVoltage;
+        energyToDecrease = duration.GetSeconds() * m_ccaCurrentA * supplyVoltage;
         break;
     default:
         NS_FATAL_ERROR("LoraRadioEnergyModel:Undefined radio state: " << m_currentState);
