@@ -447,21 +447,28 @@ LorawanMacHelper::SetSimilarSpreadingFactorsUp(NodeContainer endDevices)
 {
     NS_LOG_FUNCTION_NOARGS();
 
-    std::vector<int> sfQuantity(7, 0);
-    for (auto j = endDevices.Begin(); j != endDevices.End(); ++j)
-    {
-        Ptr<Node> object = *j;
-        Ptr<MobilityModel> position = object->GetObject<MobilityModel>();
-        NS_ASSERT(position);
-        Ptr<NetDevice> netDevice = object->GetDevice(0);
-        Ptr<LoraNetDevice> loraNetDevice = DynamicCast<LoraNetDevice>(netDevice);
-        NS_ASSERT(loraNetDevice);
-        Ptr<ClassAEndDeviceLorawanMac> mac =
-            DynamicCast<ClassAEndDeviceLorawanMac>(loraNetDevice->GetMac());
-        NS_ASSERT(mac);
+    std::vector<int> sfQuantity(6, 0); // SF7-SF12 (6 значений)
+    uint32_t deviceIndex = 0;          // Счетчик устройств
 
-        mac->SetDataRate(0);
-        sfQuantity[6] = sfQuantity[6] + 1;
+    for (auto node = endDevices.Begin(); node != endDevices.End(); ++node)
+    {
+        // Получаем MAC-слой устройства
+        Ptr<ClassAEndDeviceLorawanMac> mac = (*node)
+                                                 ->GetDevice(0)
+                                                 ->GetObject<LoraNetDevice>()
+                                                 ->GetMac()
+                                                 ->GetObject<ClassAEndDeviceLorawanMac>();
+        NS_ABORT_MSG_IF(!mac, "MAC layer не найден");
+
+        // Распределение SF по циклу: 7, 8, 9, 10, 11, 12, 7, 8...
+        int dataRate = 5 - (deviceIndex % 6); // DR5 (SF7) → DR0 (SF12)
+        mac->SetDataRate(dataRate);
+
+        // Обновляем счетчик SF
+        int sf = 12 - dataRate; // Преобразуем DR в SF
+        sfQuantity[sf - 7]++;   // Индекс 0 = SF7, индекс 5 = SF12
+
+        deviceIndex++;
     }
 
     return sfQuantity;
