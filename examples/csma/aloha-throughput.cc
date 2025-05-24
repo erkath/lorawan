@@ -40,6 +40,7 @@
 
 #include <algorithm>
 #include <ctime>
+#include <iomanip>
 
 using namespace ns3;
 using namespace lorawan;
@@ -47,10 +48,10 @@ using namespace lorawan;
 NS_LOG_COMPONENT_DEFINE("AlohaThroughput");
 
 // Network settings
-int nDevices = 300;                //!< Number of end device nodes to create
-int nGateways = 10;                //!< Number of gateway nodes to create
-double radiusMeters = 20;          //!< Radius (m) of the deployment
-double simulationTimeSeconds = 60; //!< Scenario duration (s) in simulated time
+int nDevices = 300;                 //!< Number of end device nodes to create
+int nGateways = 1;                  //!< Number of gateway nodes to create
+double radiusMeters = 1000;         //!< Radius (m) of the deployment
+double simulationTimeSeconds = 180; //!< Scenario duration (s) in simulated time
 
 // double simulationTimeSeconds = 500; //!< Scenario duration (s) in simulated time
 
@@ -103,6 +104,26 @@ OnPacketReceptionCallback(Ptr<const Packet> packet, uint32_t receiverNodeId)
 // Output control
 bool printBuildingInfo = true; //!< Whether to print building information
 
+std::vector<Vector>
+GenerateClusterCentersWithAllocator(uint32_t numClusters, double totalAreaRadius)
+{
+   std::vector<Vector> clusterCenters;
+
+   // Set up UniformDiscPositionAllocator centered at (0,0) with radius = totalAreaRadius
+   Ptr<UniformDiscPositionAllocator> posAllocator = CreateObject<UniformDiscPositionAllocator>();
+   posAllocator->SetX(0.0);
+   posAllocator->SetY(0.0);
+   posAllocator->SetRho(totalAreaRadius);
+
+   // Retrieve positions
+   for (uint32_t i = 0; i < numClusters; ++i)
+   {
+       clusterCenters.push_back(posAllocator->GetNext());
+   }
+
+   return clusterCenters;
+}
+
 int
 main(int argc, char* argv[])
 {
@@ -119,7 +140,8 @@ main(int argc, char* argv[])
 
    cmd.Parse(argc, argv);
 
-   int appPeriodSeconds = 20;
+   int appPeriodSeconds = 60;
+   //    int appPeriodSeconds = simulationTimeSeconds / 3;
 
    // Set up logging
    LogComponentEnable("AlohaThroughput", LOG_LEVEL_ALL);
@@ -202,7 +224,7 @@ main(int argc, char* argv[])
 
    // Create the LorawanMacHelper
    LorawanMacHelper macHelper = LorawanMacHelper();
-   macHelper.SetRegion(LorawanMacHelper::ALOHA);
+   macHelper.SetRegion(LorawanMacHelper::EU);
 
    // Create the LoraHelper
    LoraHelper helper = LoraHelper();
@@ -218,20 +240,65 @@ main(int argc, char* argv[])
     *  Create End Devices  *
     ************************/
 
+   uint32_t numClusters = 10;
+   double radiusInsideClusterMeters = 0.5;
+   auto centers = GenerateClusterCentersWithAllocator(numClusters, radiusMeters);
+   NS_ASSERT(centers.size() == numClusters);
+
    // Create a set of nodes
    NodeContainer endDevices;
    endDevices.Create(nDevices);
 
-   // Assign a mobility model to each node
-   mobility.Install(endDevices);
+   //    // Assign a mobility model to each node
+   //    mobility.Install(endDevices);
 
    // Make it so that nodes are at a certain height > 0
-   for (auto j = endDevices.Begin(); j != endDevices.End(); ++j)
    {
-       Ptr<MobilityModel> mobility = (*j)->GetObject<MobilityModel>();
-       Vector position = mobility->GetPosition();
-       position.z = 1.2;
-       mobility->SetPosition(position);
+       uint32_t devicesPerClusterLower = nDevices / numClusters;
+       uint32_t localIdx = 0;
+       uint32_t clusterIdx = 0;
+       for (auto j = endDevices.Begin(); j != endDevices.End(); ++j)
+       {
+           NS_ASSERT(clusterIdx < numClusters);
+           mobility.SetPositionAllocator("ns3::UniformDiscPositionAllocator",
+                                         "rho",
+                                         DoubleValue(radiusInsideClusterMeters),
+                                         "X",
+                                         DoubleValue(centers[clusterIdx].x),
+                                         "Y",
+                                         DoubleValue(centers[clusterIdx].y));
+           mobility.Install(*j);
+
+           Ptr<MobilityModel> localMobility = (*j)->GetObject<MobilityModel>();
+           Vector pos = localMobility->GetPosition();
+           localMobility->SetPosition(Vector(pos.x, pos.y, 1.2));
+
+           ++localIdx;
+           if (localIdx == devicesPerClusterLower && clusterIdx != numClusters - 1) {
+               localIdx = 0;
+               ++clusterIdx;
+           }
+       }
+   }
+
+   {
+       // TODO: delete (debug logs)
+       uint32_t i = 0;
+       for (auto j = endDevices.Begin(); j != endDevices.End(); ++j)
+       {
+           auto p = (*j)->GetObject<MobilityModel>()->GetPosition();
+           NS_LOG_WARN(
+               "{" << "i: " << i
+                   << ", x: "
+                   << p.x
+                   << ", y: "
+                   << p.y
+                   << ", z: "
+                   << p.z
+                   << "},"
+           );
+           ++i;
+       }
    }
 
    // Create the LoraNetDevices of the end devices
@@ -279,9 +346,9 @@ main(int argc, char* argv[])
     *  Handle buildings  *
     **********************/
 
-   double xLength = 130;
+   double xLength = 100;
    double deltaX = 32;
-   double yLength = 64;
+   double yLength = 10;
    double deltaY = 17;
    int gridWidth = 2 * radiusMeters / (xLength + deltaX);
    int gridHeight = 2 * radiusMeters / (yLength + deltaY);
@@ -297,10 +364,10 @@ main(int argc, char* argv[])
    gridBuildingAllocator->SetAttribute("LengthY", DoubleValue(yLength));
    gridBuildingAllocator->SetAttribute("DeltaX", DoubleValue(deltaX));
    gridBuildingAllocator->SetAttribute("DeltaY", DoubleValue(deltaY));
-   gridBuildingAllocator->SetAttribute("Height", DoubleValue(6));
-   gridBuildingAllocator->SetBuildingAttribute("NRoomsX", UintegerValue(2));
-   gridBuildingAllocator->SetBuildingAttribute("NRoomsY", UintegerValue(4));
-   gridBuildingAllocator->SetBuildingAttribute("NFloors", UintegerValue(2));
+   gridBuildingAllocator->SetAttribute("Height", DoubleValue(12));
+   gridBuildingAllocator->SetBuildingAttribute("NRoomsX", UintegerValue(4));
+   gridBuildingAllocator->SetBuildingAttribute("NRoomsY", UintegerValue(8));
+   gridBuildingAllocator->SetBuildingAttribute("NFloors", UintegerValue(10));
    gridBuildingAllocator->SetAttribute(
        "MinX",
        DoubleValue(-gridWidth * (xLength + deltaX) / 2 + deltaX / 2));
@@ -336,17 +403,19 @@ main(int argc, char* argv[])
     *********************************************/
 
    Time appStopTime = Seconds(simulationTimeSeconds);
-   int packetSize = 50;
+   int packetSize = 10;
 
    PeriodicSenderHelper appHelper = PeriodicSenderHelper();
    appHelper.SetPacketSize(packetSize);
 
    ApplicationContainer appContainer{};
 
+   // Разброс периодов
    for (int i = 0; i < nDevices; ++i)
    {
        appHelper.SetPeriod(Seconds((double)appPeriodSeconds / 2 +
-                                   (double)appPeriodSeconds / 2 * (double)i / (double)nDevices));
+                                   (double)appPeriodSeconds / 10 * (double)i / (double)nDevices));
+       //        appHelper.SetPeriod(Seconds(appPeriodSeconds - appPeriodSeconds / (i % 10 + 1)));
        appContainer.Add(appHelper.Install(endDevices));
    }
 
@@ -382,6 +451,8 @@ main(int argc, char* argv[])
        macHdr.SetMType(LorawanMacHeader::UNCONFIRMED_DATA_UP);
        macHdr.SetMajor(1);
        pkt->AddHeader(macHdr);
+
+       NS_LOG_WARN("pkt->GetSize(): " << pkt->GetSize());
 
        outputFile << LoraPhy::GetOnAirTime(pkt, txParams).GetMicroSeconds() << " ";
    }
@@ -431,7 +502,7 @@ main(int argc, char* argv[])
            ->TraceConnectWithoutContext("StartSending", MakeCallback(OnTransmissionCallback));
    }
 
-   LorawanMacHelper::SetSpreadingFactorsUp(endDevices, gateways, channel);
+   LorawanMacHelper::SetSimilarSpreadingFactorsUp(endDevices);
 
    /************************
     * Install Energy Model *
@@ -484,11 +555,11 @@ main(int argc, char* argv[])
    FileHelper fileHelper; //    fileHelper.ConfigureFile("battery-level-without-cad-" +
                           //    std::to_string(nDevices),
    //    FileAggregator::SPACE_SEPARATED);
-   fileHelper.ConfigureFile("battery-level-" + cadFlag + "-" +
-                                std::to_string(simulationTimeSeconds) + "" +
-                                std::to_string(nDevices),
+   fileHelper.ConfigureFile("battery-level-" + cadFlag + "-" + std::to_string(simulationTimeSeconds) + "" + std::to_string(nDevices),
                             FileAggregator::SPACE_SEPARATED);
    //    fileHelper.Set2dFormat("Time (Seconds) = %.3e\tEnergy Level = %.0f");
+
+   // TODO раскомментировать
    fileHelper.WriteProbeArray("ns3::DoubleProbe", energySourceNames, "Output");
    //    fileHelper.WriteProbe("ns3::DoubleProbe", "/Names/EnergySource1/RemainingEnergy",
    //    "Output");
@@ -513,6 +584,14 @@ main(int argc, char* argv[])
    {
        std::cout << "Packet sent at SF=" << i + 7 << ": " << packetsSent.at(i) << "; "
                  << "Packet received at SF=" << i + 7 << ": " << packetsReceived.at(i)
+                 << std::endl;
+   }
+
+   for (int i = 0; i < 6; i++)
+   {
+       std::cout <<i + 7 << ": " << sources.GetN() << ": "
+                 << "(" << packetsSent.at(i) << ", "
+                 << packetsReceived.at(i) << ")"
                  << std::endl;
    }
 
