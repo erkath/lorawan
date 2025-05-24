@@ -499,7 +499,7 @@ class EndDeviceLorawanMac : public LorawanMac
     uint16_t m_currentFCnt;
 
 
-    Time m_slotTime = MicroSeconds(10000);
+    Time m_slotTime = Seconds(1);
     uint32_t cw = 1;                             //!< the current contention window
     uint32_t cwMin = 1;                         //!< the minimum contention window
     uint32_t cwMax = 1000;                         //!< the maximum contention window
